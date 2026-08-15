@@ -193,18 +193,20 @@ class BlueprintApp(QMainWindow):
         if not self.current_project:
             return
         
-        # Build full path from tree hierarchy
         path_parts = []
         current = item
+        
         while current:
-            path_parts.insert(0, current.text())
+            path_parts.insert(0, current.text(0))
             current = current.parent()
         
         # Skip root project name
-        path_parts = path_parts[1:]
+        if path_parts and path_parts[0] == self.current_project.name:
+            path_parts = path_parts[1:]
+        
         if not path_parts:
             return
-            
+        
         file_path = self.current_project.path
         for part in path_parts:
             file_path = file_path / part
