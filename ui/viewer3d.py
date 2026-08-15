@@ -31,7 +31,7 @@ class Viewer3D(QOpenGLWidget):
         self.model_faces = None
         self.camera_rot_x = 20
         self.camera_rot_y = 45
-        self.camera_zoom = 8  # Closer
+        self.camera_zoom = 25  # Zoom out more for bigger model
         
         fmt = QSurfaceFormat()
         fmt.setVersion(2, 1)
@@ -44,13 +44,8 @@ class Viewer3D(QOpenGLWidget):
     def initializeGL(self):
         glClearColor(0.039, 0.055, 0.153, 1.0)
         glEnable(GL_DEPTH_TEST)
-        glEnable(GL_LIGHTING)
-        glEnable(GL_LIGHT0)
-        glEnable(GL_COLOR_MATERIAL)
-        glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
-        
-        light_pos = [5, 5, 5, 0]
-        glLight(GL_LIGHT0, GL_POSITION, light_pos)
+        glDisable(GL_LIGHTING)
+        glDisable(GL_LIGHT0)
     
     def resizeGL(self, w, h):
         glViewport(0, 0, w, h)
@@ -87,18 +82,23 @@ class Viewer3D(QOpenGLWidget):
         if self.model_vertices is None or self.model_faces is None:
             return
         
-        glColor3f(0.2, 0.8, 1)
-        glBegin(GL_TRIANGLES)
+        glLineWidth(1.5)
+        glColor3f(0, 0.85, 1)
+        glBegin(GL_LINES)
         
         for face in self.model_faces:
             try:
-                for vertex_idx in face:
-                    v = self.model_vertices[vertex_idx]
-                    glVertex3f(float(v[0]), float(v[1]), float(v[2]))
+                # Draw edges of each face
+                for i in range(len(face)):
+                    v1 = self.model_vertices[face[i]]
+                    v2 = self.model_vertices[face[(i+1) % len(face)]]
+                    glVertex3f(float(v1[0]), float(v1[1]), float(v1[2]))
+                    glVertex3f(float(v2[0]), float(v2[1]), float(v2[2]))
             except:
                 pass
         
         glEnd()
+        glLineWidth(1.0)
     
     def load_file(self, file_path):
         print(f"[3D] Loading: {file_path}")
@@ -129,7 +129,7 @@ class Viewer3D(QOpenGLWidget):
             bounds = mesh.bounds
             print(f"[3D] Bounds: {bounds}")
             if (bounds[1] - bounds[0]).max() > 0:
-                scale = 30.0 / (bounds[1] - bounds[0]).max()  # Bigger scale
+                scale = 100.0 / (bounds[1] - bounds[0]).max()  # Even bigger
                 mesh.apply_scale(scale)
                 print(f"[3D] Scaled by {scale}")
             
