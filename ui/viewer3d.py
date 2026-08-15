@@ -63,7 +63,7 @@ class Viewer3D(QOpenGLWidget):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
         
-        glTranslatef(0, 2, -self.camera_zoom)
+        glTranslatef(0, 3.5, -self.camera_zoom)
         glRotatef(self.camera_rot_x, 1, 0, 0)
         glRotatef(self.camera_rot_y, 0, 1, 0)
         
@@ -101,32 +101,47 @@ class Viewer3D(QOpenGLWidget):
         glEnd()
     
     def load_file(self, file_path):
+        print(f"[3D] Loading: {file_path}")
+        print(f"[3D] Trimesh available: {HAS_TRIMESH}")
+        
         if not HAS_TRIMESH:
+            print("[3D] Trimesh not available")
             return
         
         try:
+            print(f"[3D] Opening file...")
             mesh = trimesh.load(str(file_path))
+            print(f"[3D] Loaded, type: {type(mesh)}")
             
             if isinstance(mesh, trimesh.Scene):
+                print("[3D] Is Scene, extracting meshes")
                 meshes = list(mesh.geometry.values())
                 if meshes:
                     mesh = trimesh.util.concatenate(meshes)
             elif isinstance(mesh, list):
+                print("[3D] Is list, concatenating")
                 mesh = trimesh.util.concatenate(mesh)
+            
+            print(f"[3D] Vertices: {len(mesh.vertices)}, Faces: {len(mesh.faces)}")
             
             # Center and scale
             mesh.apply_translation(-mesh.centroid)
             bounds = mesh.bounds
+            print(f"[3D] Bounds: {bounds}")
             if (bounds[1] - bounds[0]).max() > 0:
                 scale = 5.0 / (bounds[1] - bounds[0]).max()
                 mesh.apply_scale(scale)
+                print(f"[3D] Scaled by {scale}")
             
             self.model_vertices = np.array(mesh.vertices, dtype=np.float32)
             self.model_faces = np.array(mesh.faces, dtype=np.uint32)
             
+            print(f"[3D] SUCCESS - Model ready to render")
             self.update()
         except Exception as e:
-            print(f"Error loading 3D: {e}")
+            print(f"[3D] ERROR: {e}")
+            import traceback
+            traceback.print_exc()
             self.model_vertices = None
             self.model_faces = None
     
