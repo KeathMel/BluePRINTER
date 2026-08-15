@@ -6,8 +6,8 @@ from pathlib import Path
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QFileDialog, QLabel, QLineEdit, QTextEdit,
                              QDialog, QMessageBox, QTreeWidget, QTreeWidgetItem, QMenu)
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont, QPixmap, QPainter, QBrush, QPen, QColor
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 
 from ui.theme import apply_iron_man_theme
 from ui.viewer import ViewerWidget
@@ -54,22 +54,23 @@ class BlueprintApp(QMainWindow):
         btn_new_proj.clicked.connect(self.create_project)
         left_layout.addWidget(btn_new_proj)
         
-        # CENTER - Viewer
+        # CENTER - Viewer (images, text files, 3D)
+        center_widget = QWidget()
+        center_layout = QVBoxLayout(center_widget)
+        center_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Image/3D viewer
         self.viewer = ViewerWidget()
         self.viewer.marker_selected.connect(self.on_marker_selected)
+        center_layout.addWidget(self.viewer)
         
-        # RIGHT - Text/Marker Panel
-        self.right_panel = QWidget()
-        right_layout = QVBoxLayout(self.right_panel)
+        # Text file editor
+        self.text_editor = QTextEdit()
+        self.text_editor.setVisible(False)
+        self.text_editor.textChanged.connect(self.auto_save_text_file)
+        center_layout.addWidget(self.text_editor)
         
-        # Text file viewer
-        self.text_viewer = QTextEdit()
-        self.text_viewer.setReadOnly(False)
-        self.text_viewer.setVisible(False)
-        self.text_viewer.textChanged.connect(self.auto_save_text)
-        right_layout.addWidget(self.text_viewer, 1)
-        
-        # Marker panel
+        # RIGHT - Marker Panel (only for image annotations)
         self.marker_panel = QWidget()
         marker_layout = QVBoxLayout(self.marker_panel)
         
@@ -94,12 +95,11 @@ class BlueprintApp(QMainWindow):
         marker_layout.addStretch()
         self.marker_panel.setLayout(marker_layout)
         self.marker_panel.setVisible(False)
-        right_layout.addWidget(self.marker_panel, 1)
         
         # Main layout
         main_layout.addWidget(left_panel, 1)
-        main_layout.addWidget(self.viewer, 3)
-        main_layout.addWidget(self.right_panel, 1)
+        main_layout.addWidget(center_widget, 3)
+        main_layout.addWidget(self.marker_panel, 1)
         
         self.refresh_projects()
         
@@ -109,7 +109,6 @@ class BlueprintApp(QMainWindow):
     def refresh_projects(self):
         self.tree.clear()
         for proj in self.project_manager.get_projects():
-            # Create markers folder
             markers_folder = proj.path / "markers"
             markers_folder.mkdir(exist_ok=True)
             
@@ -149,8 +148,7 @@ class BlueprintApp(QMainWindow):
             self.current_project = self.project_manager.get_project(item_path)
             self.current_file = None
             self.viewer.clear()
-            self.text_viewer.setText("")
-            self.text_viewer.setVisible(False)
+            self.text_editor.setVisible(False)
             self.marker_panel.setVisible(False)
         elif item_type == 'file':
             self.current_file = Path(item_path)
@@ -162,54 +160,55 @@ class BlueprintApp(QMainWindow):
         
         ext = self.current_file.suffix.lower()
         
-        # Text files
         if ext in ['.txt', '.py', '.js', '.md', '.json', '.xml', '.html', '.css']:
             self.load_text_file()
-        # Image files
         elif ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
             self.load_image_file()
-        # 3D files
         elif ext in ['.obj', '.glb', '.gltf']:
             self.load_3d_file()
         else:
             self.viewer.clear()
-            self.text_viewer.setVisible(False)
+            self.text_editor.setVisible(False)
             self.marker_panel.setVisible(False)
     
     def load_text_file(self):
         try:
             with open(self.current_file, 'r') as f:
                 content = f.read()
-            self.text_viewer.blockSignals(True)
-            self.text_viewer.setText(content)
-            self.text_viewer.blockSignals(False)
-            self.text_viewer.setVisible(True)
+            self.text_editor.blockSignals(True)
+            self.text_editor.setText(content)
+            self.text_editor.blockSignals(False)
+            self.text_editor.setVisible(True)
             self.viewer.clear()
             self.marker_panel.setVisible(False)
         except:
-            self.text_viewer.setText("Error reading file")
-            self.text_viewer.setVisible(True)
+            self.text_editor.setText("Error reading file")
+            self.text_editor.setVisible(True)
     
-    def auto_save_text(self):
-        if not self.current_file or not self.current_file.suffix.lower() in ['.txt', '.py', '.js', '.md', '.json', '.xml', '.html', '.css']:
+    def auto_save_text_file(self):
+        if not self.current_file:
+            return
+        
+        ext = self.current_file.suffix.lower()
+        if ext not in ['.txt', '.py', '.js', '.md', '.json', '.xml', '.html', '.css']:
             return
         
         try:
             with open(self.current_file, 'w') as f:
-                f.write(self.text_viewer.toPlainText())
+                f.write(self.text_editor.toPlainText())
         except:
             pass
     
     def load_image_file(self):
-        self.text_viewer.setVisible(False)
+        self.text_editor.setVisible(False)
         self.marker_panel.setVisible(False)
-        self.viewer.load_file(str(self.current_file))
+        self.viewer.load_file(str(self.current_file), self.current_project)
         self.load_markers()
     
     def load_3d_file(self):
-        self.text_viewer.setVisible(False)
+        self.text_editor.setVisible(False)
         self.marker_panel.setVisible(False)
-        self.viewer.load_file(str(self.current_file))
+        self.viewer.load_file(str(self.current_file), self.current_project)
     
     def on_right_click(self, pos):
         item = self.tree.itemAt(pos)
@@ -381,11 +380,10 @@ class BlueprintApp(QMainWindow):
         self.marker_title.blockSignals(False)
         self.marker_desc.blockSignals(False)
         
-        self.text_viewer.setVisible(False)
         self.marker_panel.setVisible(True)
     
     def auto_save_marker(self):
-        if not self.selected_marker or not self.current_file:
+        if not self.selected_marker or not self.current_file or not self.current_project:
             return
         
         self.selected_marker['title'] = self.marker_title.text()
@@ -407,6 +405,8 @@ class BlueprintApp(QMainWindow):
             with open(json_path) as f:
                 markers = json.load(f)
                 self.viewer.set_markers(markers)
+        else:
+            self.viewer.set_markers([])
     
     def save_markers(self):
         if not self.current_file or not self.current_project:

@@ -10,6 +10,7 @@ class ViewerWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.current_file = None
+        self.current_project = None
         self.file_type = None
         self.markers = []
         self.dragging_marker = None
@@ -27,9 +28,11 @@ class ViewerWidget(QWidget):
         self.viewer_label.mouseMoveEvent = self.on_mouse_move
         self.viewer_label.mousePressEvent = self.on_mouse_press
         self.viewer_label.mouseReleaseEvent = self.on_mouse_release
+        self.viewer_label.contextMenuEvent = self.on_right_click
     
-    def load_file(self, file_path):
+    def load_file(self, file_path, project=None):
         self.current_file = Path(file_path)
+        self.current_project = project
         ext = self.current_file.suffix.lower()
         
         if ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
@@ -96,6 +99,12 @@ class ViewerWidget(QWidget):
                 self.marker_selected.emit(marker)
                 self.dragging_marker = marker
                 return
+    
+    def on_right_click(self, event):
+        if self.file_type != 'image' or not self.image_pixmap:
+            return
+        
+        pos = self.viewer_label.mapFromGlobal(self.mapToGlobal(event.pos()))
         
         marker = {
             'title': 'Marker',
@@ -119,6 +128,7 @@ class ViewerWidget(QWidget):
     
     def clear(self):
         self.current_file = None
+        self.current_project = None
         self.markers = []
         self.image_pixmap = None
         self.viewer_label.setText("")
