@@ -21,6 +21,7 @@ class ViewerWidget(QWidget):
         self.viewer_label.setStyleSheet("background-color: #0A0E27;")
         
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.viewer_label)
         self.setStyleSheet("background-color: #0A0E27;")
         
@@ -88,6 +89,7 @@ class ViewerWidget(QWidget):
         if self.file_type != 'image' or not self.image_pixmap:
             return
         
+        # LEFT CLICK: Select marker
         pos = event.pos()
         
         for marker in self.markers:
@@ -104,7 +106,8 @@ class ViewerWidget(QWidget):
         if self.file_type != 'image' or not self.image_pixmap:
             return
         
-        pos = self.viewer_label.mapFromGlobal(self.mapToGlobal(event.pos()))
+        # RIGHT CLICK: Create new marker at cursor position
+        pos = event.pos()
         
         marker = {
             'title': 'Marker',
@@ -122,6 +125,7 @@ class ViewerWidget(QWidget):
             self.dragging_marker['position']['x'] = pos.x()
             self.dragging_marker['position']['y'] = pos.y()
             self.refresh_display()
+            self.marker_selected.emit(self.dragging_marker)
     
     def on_mouse_release(self, event):
         self.dragging_marker = None
@@ -131,4 +135,6 @@ class ViewerWidget(QWidget):
         self.current_project = None
         self.markers = []
         self.image_pixmap = None
+        self.file_type = None
         self.viewer_label.setText("")
+        self.viewer_label.setPixmap(QPixmap())

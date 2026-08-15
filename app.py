@@ -160,6 +160,19 @@ class BlueprintApp(QMainWindow):
         
         ext = self.current_file.suffix.lower()
         
+        # Always clear text editor and marker panel first
+        self.text_editor.blockSignals(True)
+        self.text_editor.setText("")
+        self.text_editor.blockSignals(False)
+        self.text_editor.setVisible(False)
+        self.marker_panel.setVisible(False)
+        self.marker_title.blockSignals(True)
+        self.marker_title.setText("")
+        self.marker_title.blockSignals(False)
+        self.marker_desc.blockSignals(True)
+        self.marker_desc.setText("")
+        self.marker_desc.blockSignals(False)
+        
         if ext in ['.txt', '.py', '.js', '.md', '.json', '.xml', '.html', '.css']:
             self.load_text_file()
         elif ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
@@ -168,8 +181,6 @@ class BlueprintApp(QMainWindow):
             self.load_3d_file()
         else:
             self.viewer.clear()
-            self.text_editor.setVisible(False)
-            self.marker_panel.setVisible(False)
     
     def load_text_file(self):
         try:
