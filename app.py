@@ -69,6 +69,7 @@ class BlueprintApp(QMainWindow):
         self.viewer3d = Viewer3D()
         self.viewer3d.marker_selected.connect(self.on_marker_selected)
         self.viewer3d.setVisible(False)
+        self.viewer3d.setMinimumHeight(400)
         center_layout.addWidget(self.viewer3d)
         
         # Text file editor
@@ -195,6 +196,8 @@ class BlueprintApp(QMainWindow):
             pass
     
     def load_text_file(self):
+        self.viewer.setVisible(False)
+        self.viewer3d.setVisible(False)
         try:
             with open(self.current_file, 'r') as f:
                 content = f.read()
@@ -221,10 +224,15 @@ class BlueprintApp(QMainWindow):
             pass
     
     def load_image_file(self):
+        self.viewer3d.setVisible(False)
+        self.text_editor.setVisible(False)
         self.viewer.load_file(str(self.current_file), self.current_project)
+        self.viewer.setVisible(True)
         self.load_markers()
     
     def load_3d_file(self):
+        self.viewer.setVisible(False)
+        self.text_editor.setVisible(False)
         self.viewer3d.load_file(str(self.current_file))
         self.viewer3d.setVisible(True)
         self.load_markers()

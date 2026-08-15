@@ -31,7 +31,7 @@ class Viewer3D(QOpenGLWidget):
         self.model_faces = None
         self.camera_rot_x = 20
         self.camera_rot_y = 45
-        self.camera_zoom = 15
+        self.camera_zoom = 8  # Closer
         
         fmt = QSurfaceFormat()
         fmt.setVersion(2, 1)
@@ -63,7 +63,7 @@ class Viewer3D(QOpenGLWidget):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
         
-        glTranslatef(0, 3.5, -self.camera_zoom)
+        glTranslatef(0, 0, -self.camera_zoom)
         glRotatef(self.camera_rot_x, 1, 0, 0)
         glRotatef(self.camera_rot_y, 0, 1, 0)
         
