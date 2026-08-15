@@ -1,7 +1,7 @@
 from pathlib import Path
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt5.QtGui import QPixmap, QColor, QPainter, QBrush, QPen, QFont
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QRect
 import math
 
 class ViewerWidget(QWidget):
@@ -18,6 +18,7 @@ class ViewerWidget(QWidget):
         self.display_pixmap = None
         self.scale_x = 1.0
         self.scale_y = 1.0
+        self.pixmap_rect = QRect()
         
         self.viewer_label = QLabel()
         self.viewer_label.setAlignment(Qt.AlignCenter)
@@ -58,7 +59,6 @@ class ViewerWidget(QWidget):
         scaled = pixmap.scaledToWidth(900, Qt.SmoothTransformation)
         self.display_pixmap = scaled
         
-        # Calculate scale factors for coordinate mapping
         self.scale_x = self.original_pixmap.width() / self.display_pixmap.width()
         self.scale_y = self.original_pixmap.height() / self.display_pixmap.height()
         
@@ -76,7 +76,6 @@ class ViewerWidget(QWidget):
         painter = QPainter(pixmap)
         
         for marker in self.markers:
-            # Coordinates are in original image space, convert to display space
             orig_x = marker.get('position', {}).get('x', 0)
             orig_y = marker.get('position', {}).get('y', 0)
             
@@ -93,6 +92,28 @@ class ViewerWidget(QWidget):
         
         painter.end()
         self.viewer_label.setPixmap(pixmap)
+        
+        # Calculate pixmap rect for coordinate mapping
+        pm = self.viewer_label.pixmap()
+        if pm:
+            label_rect = self.viewer_label.rect()
+            pm_width = pm.width()
+            pm_height = pm.height()
+            x_offset = (label_rect.width() - pm_width) / 2
+            y_offset = (label_rect.height() - pm_height) / 2
+            self.pixmap_rect = QRect(int(x_offset), int(y_offset), pm_width, pm_height)
+    
+    def screen_to_image_coords(self, screen_x, screen_y):
+        """Convert screen coordinates to original image coordinates"""
+        # Map screen coords to display pixmap coords
+        pm_x = screen_x - self.pixmap_rect.x()
+        pm_y = screen_y - self.pixmap_rect.y()
+        
+        # Map display pixmap coords to original image coords
+        orig_x = pm_x * self.scale_x
+        orig_y = pm_y * self.scale_y
+        
+        return orig_x, orig_y
     
     def set_markers(self, markers):
         self.markers = markers
@@ -103,12 +124,7 @@ class ViewerWidget(QWidget):
             return
         
         # LEFT CLICK: Select marker
-        pos_x = event.pos().x()
-        pos_y = event.pos().y()
-        
-        # Map to original image coordinates
-        orig_x = pos_x * self.scale_x
-        orig_y = pos_y * self.scale_y
+        orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
         
         for marker in self.markers:
             mx = marker.get('position', {}).get('x', 0)
@@ -125,12 +141,7 @@ class ViewerWidget(QWidget):
             return
         
         # RIGHT CLICK: Create new marker
-        pos_x = event.pos().x()
-        pos_y = event.pos().y()
-        
-        # Map to original image coordinates
-        orig_x = pos_x * self.scale_x
-        orig_y = pos_y * self.scale_y
+        orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
         
         marker = {
             'title': 'Marker',
@@ -144,12 +155,7 @@ class ViewerWidget(QWidget):
     
     def on_mouse_move(self, event):
         if self.dragging_marker and self.file_type == 'image':
-            pos_x = event.pos().x()
-            pos_y = event.pos().y()
-            
-            # Map to original image coordinates
-            orig_x = pos_x * self.scale_x
-            orig_y = pos_y * self.scale_y
+            orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
             
             self.dragging_marker['position']['x'] = orig_x
             self.dragging_marker['position']['y'] = orig_y

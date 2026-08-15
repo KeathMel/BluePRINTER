@@ -392,6 +392,7 @@ class BlueprintApp(QMainWindow):
         self.marker_desc.blockSignals(False)
         
         self.marker_panel.setVisible(True)
+        self.save_markers()
     
     def auto_save_marker(self):
         if not self.selected_marker or not self.current_file or not self.current_project:
