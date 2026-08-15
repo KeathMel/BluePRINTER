@@ -64,9 +64,10 @@ class BlueprintApp(QMainWindow):
         
         # Text file viewer
         self.text_viewer = QTextEdit()
-        self.text_viewer.setReadOnly(True)
+        self.text_viewer.setReadOnly(False)
         self.text_viewer.setVisible(False)
-        right_layout.addWidget(self.text_viewer)
+        self.text_viewer.textChanged.connect(self.auto_save_text)
+        right_layout.addWidget(self.text_viewer, 1)
         
         # Marker panel
         self.marker_panel = QWidget()
@@ -93,9 +94,7 @@ class BlueprintApp(QMainWindow):
         marker_layout.addStretch()
         self.marker_panel.setLayout(marker_layout)
         self.marker_panel.setVisible(False)
-        right_layout.addWidget(self.marker_panel)
-        
-        right_layout.addStretch()
+        right_layout.addWidget(self.marker_panel, 1)
         
         # Main layout
         main_layout.addWidget(left_panel, 1)
@@ -181,13 +180,25 @@ class BlueprintApp(QMainWindow):
         try:
             with open(self.current_file, 'r') as f:
                 content = f.read()
+            self.text_viewer.blockSignals(True)
             self.text_viewer.setText(content)
+            self.text_viewer.blockSignals(False)
             self.text_viewer.setVisible(True)
             self.viewer.clear()
             self.marker_panel.setVisible(False)
         except:
             self.text_viewer.setText("Error reading file")
             self.text_viewer.setVisible(True)
+    
+    def auto_save_text(self):
+        if not self.current_file or not self.current_file.suffix.lower() in ['.txt', '.py', '.js', '.md', '.json', '.xml', '.html', '.css']:
+            return
+        
+        try:
+            with open(self.current_file, 'w') as f:
+                f.write(self.text_viewer.toPlainText())
+        except:
+            pass
     
     def load_image_file(self):
         self.text_viewer.setVisible(False)
