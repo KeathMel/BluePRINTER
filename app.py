@@ -193,7 +193,22 @@ class BlueprintApp(QMainWindow):
         if not self.current_project:
             return
         
-        file_path = self.current_project.path / item.text()
+        # Build full path from tree hierarchy
+        path_parts = []
+        current = item
+        while current:
+            path_parts.insert(0, current.text())
+            current = current.parent()
+        
+        # Skip root project name
+        path_parts = path_parts[1:]
+        if not path_parts:
+            return
+            
+        file_path = self.current_project.path
+        for part in path_parts:
+            file_path = file_path / part
+        
         if file_path.is_file():
             self.current_file = file_path
             self.viewer.load_file(str(file_path))

@@ -40,7 +40,6 @@ def apply_iron_man_theme(app):
     
     QPushButton:hover {
         background-color: rgba(0, 217, 255, 0.2);
-        box-shadow: 0 0 10px rgba(0, 217, 255, 0.4);
     }
     
     QLineEdit, QTextEdit {
