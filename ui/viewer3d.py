@@ -31,7 +31,7 @@ class Viewer3D(QOpenGLWidget):
         self.model_faces = None
         self.camera_rot_x = 20
         self.camera_rot_y = 45
-        self.camera_zoom = 25  # Zoom out more for bigger model
+        self.camera_zoom = 60  # Much further out
         
         fmt = QSurfaceFormat()
         fmt.setVersion(2, 1)
@@ -66,7 +66,7 @@ class Viewer3D(QOpenGLWidget):
             self.draw_model()
         
         # Draw markers
-        glColor3f(0, 0.85, 1)
+        glColor3f(0, 0.85, 1)  # Keep markers cyan to distinguish from model
         for marker in self.markers:
             x = marker.get('position', {}).get('x', 0)
             y = marker.get('position', {}).get('y', 0)
@@ -83,7 +83,7 @@ class Viewer3D(QOpenGLWidget):
             return
         
         glLineWidth(1.5)
-        glColor3f(0, 0.85, 1)
+        glColor3f(1.0, 1.0, 1.0)  # White wireframe
         glBegin(GL_LINES)
         
         for face in self.model_faces:
@@ -129,7 +129,7 @@ class Viewer3D(QOpenGLWidget):
             bounds = mesh.bounds
             print(f"[3D] Bounds: {bounds}")
             if (bounds[1] - bounds[0]).max() > 0:
-                scale = 100.0 / (bounds[1] - bounds[0]).max()  # Even bigger
+                scale = 300.0 / (bounds[1] - bounds[0]).max()  # Much bigger
                 mesh.apply_scale(scale)
                 print(f"[3D] Scaled by {scale}")
             
