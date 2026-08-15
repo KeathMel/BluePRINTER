@@ -9,7 +9,10 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
-
+from ui.theme import apply_iron_man_theme
+from ui.viewer import ViewerWidget
+from ui.viewer3d import Viewer3D
+from ui.project_manager import ProjectManager
 
 class BlueprintApp(QMainWindow):
     def __init__(self):
@@ -57,10 +60,16 @@ class BlueprintApp(QMainWindow):
         center_layout = QVBoxLayout(center_widget)
         center_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Image/3D viewer
+        # Image viewer
         self.viewer = ViewerWidget()
         self.viewer.marker_selected.connect(self.on_marker_selected)
         center_layout.addWidget(self.viewer)
+        
+        # 3D viewer
+        self.viewer3d = Viewer3D()
+        self.viewer3d.marker_selected.connect(self.on_marker_selected)
+        self.viewer3d.setVisible(False)
+        center_layout.addWidget(self.viewer3d)
         
         # Text file editor
         self.text_editor = QTextEdit()
@@ -68,7 +77,7 @@ class BlueprintApp(QMainWindow):
         self.text_editor.textChanged.connect(self.auto_save_text_file)
         center_layout.addWidget(self.text_editor)
         
-        # RIGHT - Marker Panel (only for image annotations)
+        # RIGHT - Marker Panel
         self.marker_panel = QWidget()
         marker_layout = QVBoxLayout(self.marker_panel)
         
@@ -146,6 +155,8 @@ class BlueprintApp(QMainWindow):
             self.current_project = self.project_manager.get_project(item_path)
             self.current_file = None
             self.viewer.clear()
+            self.viewer3d.clear()
+            self.viewer3d.setVisible(False)
             self.text_editor.setVisible(False)
             self.marker_panel.setVisible(False)
         elif item_type == 'file':
@@ -158,11 +169,14 @@ class BlueprintApp(QMainWindow):
         
         ext = self.current_file.suffix.lower()
         
-        # Always clear text editor and marker panel first
+        # Clear everything first
         self.text_editor.blockSignals(True)
         self.text_editor.setText("")
         self.text_editor.blockSignals(False)
         self.text_editor.setVisible(False)
+        self.viewer.clear()
+        self.viewer3d.clear()
+        self.viewer3d.setVisible(False)
         self.marker_panel.setVisible(False)
         self.marker_title.blockSignals(True)
         self.marker_title.setText("")
@@ -178,7 +192,7 @@ class BlueprintApp(QMainWindow):
         elif ext in ['.obj', '.glb', '.gltf']:
             self.load_3d_file()
         else:
-            self.viewer.clear()
+            pass
     
     def load_text_file(self):
         try:
@@ -188,8 +202,6 @@ class BlueprintApp(QMainWindow):
             self.text_editor.setText(content)
             self.text_editor.blockSignals(False)
             self.text_editor.setVisible(True)
-            self.viewer.clear()
-            self.marker_panel.setVisible(False)
         except:
             self.text_editor.setText("Error reading file")
             self.text_editor.setVisible(True)
@@ -209,12 +221,13 @@ class BlueprintApp(QMainWindow):
             pass
     
     def load_image_file(self):
-        self.text_editor.setVisible(False)
-        self.marker_panel.setVisible(False)
         self.viewer.load_file(str(self.current_file), self.current_project)
         self.load_markers()
     
-
+    def load_3d_file(self):
+        self.viewer3d.load_file(str(self.current_file))
+        self.viewer3d.setVisible(True)
+        self.load_markers()
     
     def on_right_click(self, pos):
         item = self.tree.itemAt(pos)
@@ -411,9 +424,15 @@ class BlueprintApp(QMainWindow):
         if json_path.exists():
             with open(json_path) as f:
                 markers = json.load(f)
-                self.viewer.set_markers(markers)
+                if self.viewer3d.isVisible():
+                    self.viewer3d.set_markers(markers)
+                else:
+                    self.viewer.set_markers(markers)
         else:
-            self.viewer.set_markers([])
+            if self.viewer3d.isVisible():
+                self.viewer3d.set_markers([])
+            else:
+                self.viewer.set_markers([])
     
     def save_markers(self):
         if not self.current_file or not self.current_project:
@@ -425,8 +444,10 @@ class BlueprintApp(QMainWindow):
         file_hash = self.current_file.name.replace('.', '_')
         json_path = markers_folder / f"{file_hash}.json"
         
+        markers = self.viewer3d.markers if self.viewer3d.isVisible() else self.viewer.markers
+        
         with open(json_path, 'w') as f:
-            json.dump(self.viewer.markers, f, indent=2)
+            json.dump(markers, f, indent=2)
 
 def main():
     app = QApplication(sys.argv)
