@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
-"""
-3D Annotation Blueprint Viewer
-Iron Man themed desktop application
-"""
-
 import sys
 import json
 from pathlib import Path
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QListWidget, QListWidgetItem, QPushButton, 
-                             QFileDialog, QSplitter, QLabel, QLineEdit, QTextEdit,
-                             QDialog, QMessageBox)
-from PyQt5.QtCore import Qt, QSize, QTimer, pyqtSignal
-from PyQt5.QtGui import QIcon, QFont, QColor
-from PyQt5.QtOpenGL import QGLWidget
+                             QFileDialog, QLabel, QLineEdit, QTextEdit,
+                             QDialog, QMessageBox, QTreeWidget, QTreeWidgetItem)
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QFont, QPixmap, QPainter, QBrush, QPen, QColor
 
 from ui.theme import apply_iron_man_theme
 from ui.viewer import ViewerWidget
@@ -22,88 +16,76 @@ from ui.project_manager import ProjectManager
 class BlueprintApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Blueprint Viewer - Iron Man Edition")
-        self.setGeometry(100, 100, 1600, 900)
+        self.setWindowTitle("BluePRINTER")
+        self.setGeometry(100, 100, 1800, 1000)
         
         self.project_manager = ProjectManager()
         self.current_project = None
-        self.current_file_index = 0
-        self.current_files = []
+        self.current_file = None
+        self.selected_marker = None
         
         self.init_ui()
         apply_iron_man_theme(self)
         
     def init_ui(self):
-        """Initialize UI components"""
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QHBoxLayout(central)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Left panel - Projects list
+        # LEFT - Projects
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
         
-        title = QLabel("PROJECTS")
-        title.setFont(QFont("Courier", 12, QFont.Bold))
-        title.setStyleSheet("color: #00D9FF;")
-        left_layout.addWidget(title)
+        proj_title = QLabel("PROJECTS")
+        proj_title.setFont(QFont("Courier", 11, QFont.Bold))
+        proj_title.setStyleSheet("color: #00D9FF;")
+        left_layout.addWidget(proj_title)
         
         self.projects_list = QListWidget()
         self.projects_list.itemClicked.connect(self.open_project)
         left_layout.addWidget(self.projects_list)
         
-        btn_new = QPushButton("+ NEW PROJECT")
+        proj_buttons = QHBoxLayout()
+        btn_new = QPushButton("+ NEW")
         btn_new.clicked.connect(self.create_project)
-        left_layout.addWidget(btn_new)
+        proj_buttons.addWidget(btn_new)
         
-        # Center panel - File viewer
-        center_panel = QWidget()
-        center_layout = QVBoxLayout(center_panel)
+        btn_delete = QPushButton("🗑")
+        btn_delete.setMaximumWidth(50)
+        btn_delete.clicked.connect(self.delete_project)
+        proj_buttons.addWidget(btn_delete)
+        proj_buttons.addStretch()
         
-        # Top bar
-        top_bar = QHBoxLayout()
-        self.project_name = QLabel("No Project")
-        self.project_name.setFont(QFont("Courier", 14, QFont.Bold))
-        self.project_name.setStyleSheet("color: #00D9FF;")
-        top_bar.addWidget(self.project_name)
+        left_layout.addLayout(proj_buttons)
         
-        self.btn_add_file = QPushButton("+ ADD FILES")
-        self.btn_add_file.clicked.connect(self.add_files)
-        self.btn_add_file.setEnabled(False)
-        top_bar.addWidget(self.btn_add_file)
+        # CENTER-LEFT - File Tree
+        tree_panel = QWidget()
+        tree_layout = QVBoxLayout(tree_panel)
         
-        self.btn_view_planner = QPushButton("VIEW PLANNER")
-        self.btn_view_planner.clicked.connect(self.toggle_view_planner)
-        self.btn_view_planner.setEnabled(False)
-        top_bar.addWidget(self.btn_view_planner)
+        tree_title = QLabel("FILES")
+        tree_title.setFont(QFont("Courier", 10, QFont.Bold))
+        tree_title.setStyleSheet("color: #7D3AFF;")
+        tree_layout.addWidget(tree_title)
         
-        center_layout.addLayout(top_bar)
+        self.file_tree = QTreeWidget()
+        self.file_tree.setHeaderLabels(["Name"])
+        self.file_tree.itemClicked.connect(self.on_file_selected)
+        tree_layout.addWidget(self.file_tree)
         
-        # Viewer widget
+        btn_add_file = QPushButton("+ ADD FILE")
+        btn_add_file.clicked.connect(self.add_files_to_project)
+        tree_layout.addWidget(btn_add_file)
+        
+        # CENTER - Viewer
         self.viewer = ViewerWidget()
-        center_layout.addWidget(self.viewer)
+        self.viewer.marker_selected.connect(self.on_marker_selected)
         
-        # Bottom navigation
-        bottom_bar = QHBoxLayout()
-        self.btn_prev = QPushButton("◀ PREV")
-        self.btn_prev.clicked.connect(self.prev_file)
-        bottom_bar.addWidget(self.btn_prev)
+        # RIGHT - Annotations (hidden by default)
+        self.right_panel = QWidget()
+        right_layout = QVBoxLayout(self.right_panel)
         
-        self.file_label = QLabel("No files")
-        self.file_label.setAlignment(Qt.AlignCenter)
-        bottom_bar.addWidget(self.file_label)
-        
-        self.btn_next = QPushButton("NEXT ▶")
-        self.btn_next.clicked.connect(self.next_file)
-        bottom_bar.addWidget(self.btn_next)
-        
-        center_layout.addLayout(bottom_bar)
-        
-        # Right panel - Annotations
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
-        
-        ann_title = QLabel("ANNOTATIONS")
+        ann_title = QLabel("MARKER")
         ann_title.setFont(QFont("Courier", 11, QFont.Bold))
         ann_title.setStyleSheet("color: #7D3AFF;")
         right_layout.addWidget(ann_title)
@@ -111,40 +93,37 @@ class BlueprintApp(QMainWindow):
         right_layout.addWidget(QLabel("Title:"))
         self.marker_title = QLineEdit()
         self.marker_title.setPlaceholderText("Marker title...")
+        self.marker_title.textChanged.connect(self.auto_save_marker)
         right_layout.addWidget(self.marker_title)
         
         right_layout.addWidget(QLabel("Description:"))
         self.marker_desc = QTextEdit()
         self.marker_desc.setPlaceholderText("Marker description...")
-        self.marker_desc.setMaximumHeight(150)
+        self.marker_desc.setMaximumHeight(200)
+        self.marker_desc.textChanged.connect(self.auto_save_marker)
         right_layout.addWidget(self.marker_desc)
         
-        btn_save = QPushButton("SAVE MARKER")
-        btn_save.clicked.connect(self.save_marker)
-        right_layout.addWidget(btn_save)
+        btn_delete_marker = QPushButton("DELETE MARKER")
+        btn_delete_marker.clicked.connect(self.delete_marker)
+        right_layout.addWidget(btn_delete_marker)
         
-        btn_delete = QPushButton("DELETE SELECTED")
-        btn_delete.clicked.connect(self.delete_marker)
-        right_layout.addWidget(btn_delete)
+        right_layout.addStretch()
+        self.right_panel.setVisible(False)
         
-        self.markers_list = QListWidget()
-        right_layout.addWidget(self.markers_list)
-        
-        # Add all to main
+        # Main layout
         main_layout.addWidget(left_panel, 1)
-        main_layout.addWidget(center_panel, 3)
-        main_layout.addWidget(right_panel, 1)
+        main_layout.addWidget(tree_panel, 1)
+        main_layout.addWidget(self.viewer, 3)
+        main_layout.addWidget(self.right_panel, 1)
         
         self.refresh_projects()
         
     def refresh_projects(self):
-        """Refresh projects list"""
         self.projects_list.clear()
         for proj in self.project_manager.get_projects():
             self.projects_list.addItem(QListWidgetItem(proj.name))
     
     def create_project(self):
-        """Create new project"""
         dialog = QDialog(self)
         dialog.setWindowTitle("New Project")
         layout = QVBoxLayout()
@@ -166,114 +145,121 @@ class BlueprintApp(QMainWindow):
             self.refresh_projects()
             dialog.close()
     
-    def open_project(self, item):
-        """Open selected project"""
-        self.current_project = self.project_manager.get_project(item.text())
-        self.project_name.setText(self.current_project.name)
-        self.btn_add_file.setEnabled(True)
-        self.btn_view_planner.setEnabled(True)
-        self.refresh_files()
+    def delete_project(self):
+        current = self.projects_list.currentItem()
+        if not current:
+            QMessageBox.warning(self, "Error", "Select a project first")
+            return
+        
+        reply = QMessageBox.question(self, "Delete Project", 
+                                     f"Delete '{current.text()}'?",
+                                     QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.project_manager.delete_project(current.text())
+            self.current_project = None
+            self.file_tree.clear()
+            self.viewer.clear()
+            self.refresh_projects()
     
-    def add_files(self):
-        """Add files to project"""
+    def open_project(self, item):
+        self.current_project = self.project_manager.get_project(item.text())
+        self.load_file_tree()
+        self.viewer.clear()
+    
+    def load_file_tree(self):
+        self.file_tree.clear()
+        
+        if not self.current_project:
+            return
+        
+        root = QTreeWidgetItem(self.file_tree, [self.current_project.name])
+        self._add_tree_items(root, self.current_project.path)
+        self.file_tree.expandAll()
+    
+    def _add_tree_items(self, parent, path):
+        try:
+            for item in sorted(path.iterdir()):
+                if item.name.startswith('.'):
+                    continue
+                
+                tree_item = QTreeWidgetItem(parent, [item.name])
+                
+                if item.is_dir():
+                    self._add_tree_items(tree_item, item)
+        except:
+            pass
+    
+    def on_file_selected(self, item):
+        if not self.current_project:
+            return
+        
+        file_path = self.current_project.path / item.text()
+        if file_path.is_file():
+            self.current_file = file_path
+            self.viewer.load_file(str(file_path))
+            self.load_markers()
+            self.right_panel.setVisible(False)
+    
+    def add_files_to_project(self):
+        if not self.current_project:
+            QMessageBox.warning(self, "Error", "Select a project first")
+            return
+        
         files, _ = QFileDialog.getOpenFileNames(self, "Select files")
         for f in files:
             self.current_project.add_file(f)
-        self.refresh_files()
+        
+        self.load_file_tree()
     
-    def refresh_files(self):
-        """Refresh file list"""
-        self.current_files = self.current_project.get_files()
-        self.current_file_index = 0
-        self.show_current_file()
+    def on_marker_selected(self, marker_data):
+        self.selected_marker = marker_data
+        self.marker_title.blockSignals(True)
+        self.marker_desc.blockSignals(True)
+        
+        self.marker_title.setText(marker_data.get('title', ''))
+        self.marker_desc.setPlainText(marker_data.get('description', ''))
+        
+        self.marker_title.blockSignals(False)
+        self.marker_desc.blockSignals(False)
+        
+        self.right_panel.setVisible(True)
     
-    def show_current_file(self):
-        """Display current file"""
-        if not self.current_files:
-            self.file_label.setText("No files")
+    def auto_save_marker(self):
+        if not self.selected_marker or not self.current_file:
             return
         
-        file_path = self.current_files[self.current_file_index]
-        self.file_label.setText(f"{self.current_file_index + 1} / {len(self.current_files)}")
+        self.selected_marker['title'] = self.marker_title.text()
+        self.selected_marker['description'] = self.marker_desc.toPlainText()
         
-        self.viewer.load_file(file_path)
-        self.load_markers(file_path)
+        self.save_markers()
     
-    def next_file(self):
-        """Next file"""
-        if self.current_files:
-            self.current_file_index = (self.current_file_index + 1) % len(self.current_files)
-            self.show_current_file()
-    
-    def prev_file(self):
-        """Previous file"""
-        if self.current_files:
-            self.current_file_index = (self.current_file_index - 1) % len(self.current_files)
-            self.show_current_file()
-    
-    def toggle_view_planner(self):
-        """Toggle view planner"""
-        self.viewer.toggle_planner()
-    
-    def load_markers(self, file_path):
-        """Load markers for current file"""
-        json_path = Path(str(file_path) + ".markers.json")
-        self.markers_list.clear()
-        self.viewer.markers = []
+    def load_markers(self):
+        if not self.current_file:
+            return
+        
+        json_path = Path(str(self.current_file) + ".markers.json")
         
         if json_path.exists():
             with open(json_path) as f:
                 markers = json.load(f)
-                for m in markers:
-                    self.markers_list.addItem(QListWidgetItem(m['title']))
-                    self.viewer.markers.append(m)
+                self.viewer.set_markers(markers)
     
-    def save_marker(self):
-        """Save marker for current file"""
-        if not self.current_files:
+    def save_markers(self):
+        if not self.current_file:
             return
         
-        file_path = self.current_files[self.current_file_index]
-        json_path = Path(str(file_path) + ".markers.json")
-        
-        marker = {
-            'title': self.marker_title.text(),
-            'description': self.marker_desc.toPlainText(),
-            'position': self.viewer.get_marker_position(),
-        }
-        
-        markers = []
-        if json_path.exists():
-            with open(json_path) as f:
-                markers = json.load(f)
-        
-        markers.append(marker)
+        json_path = Path(str(self.current_file) + ".markers.json")
         
         with open(json_path, 'w') as f:
-            json.dump(markers, f, indent=2)
-        
-        self.load_markers(file_path)
-        self.marker_title.clear()
-        self.marker_desc.clear()
-        QMessageBox.information(self, "Success", "Marker saved!")
+            json.dump(self.viewer.markers, f, indent=2)
     
     def delete_marker(self):
-        """Delete selected marker"""
-        current = self.markers_list.currentRow()
-        if current >= 0 and self.current_files:
-            file_path = self.current_files[self.current_file_index]
-            json_path = Path(str(file_path) + ".markers.json")
-            
-            if json_path.exists():
-                with open(json_path) as f:
-                    markers = json.load(f)
-                
-                markers.pop(current)
-                
-                with open(json_path, 'w') as f:
-                    json.dump(markers, f, indent=2)
-                
-                self.load_markers(file_path)
+        if self.selected_marker and self.current_file:
+            self.viewer.markers.remove(self.selected_marker)
+            self.save_markers()
+            self.viewer.refresh_display()
+            self.right_panel.setVisible(False)
+            self.selected_marker = None
 
 def main():
     app = QApplication(sys.argv)

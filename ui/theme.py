@@ -1,7 +1,4 @@
-"""Iron Man themed UI"""
-
 def apply_iron_man_theme(app):
-    """Apply dark neon Iron Man theme"""
     stylesheet = """
     QMainWindow, QWidget {
         background-color: #0A0E27;
@@ -20,6 +17,17 @@ def apply_iron_man_theme(app):
         border-left: 3px solid #00D9FF;
     }
     
+    QTreeWidget {
+        background-color: rgba(26, 31, 58, 0.6);
+        border: 1px solid rgba(0, 217, 255, 0.2);
+        border-radius: 6px;
+        color: #E8E8E8;
+    }
+    
+    QTreeWidget::item:selected {
+        background-color: rgba(0, 217, 255, 0.3);
+    }
+    
     QPushButton {
         background-color: rgba(0, 217, 255, 0.1);
         border: 1px solid rgba(0, 217, 255, 0.4);
@@ -28,16 +36,11 @@ def apply_iron_man_theme(app):
         border-radius: 4px;
         font-family: 'Courier New', monospace;
         font-weight: bold;
-        transition: all 0.3s;
     }
     
     QPushButton:hover {
         background-color: rgba(0, 217, 255, 0.2);
         box-shadow: 0 0 10px rgba(0, 217, 255, 0.4);
-    }
-    
-    QPushButton:pressed {
-        background-color: rgba(0, 217, 255, 0.3);
     }
     
     QLineEdit, QTextEdit {
@@ -52,7 +55,6 @@ def apply_iron_man_theme(app):
     QLineEdit:focus, QTextEdit:focus {
         border: 1px solid #00D9FF;
         background-color: rgba(0, 217, 255, 0.1);
-        box-shadow: 0 0 10px rgba(0, 217, 255, 0.3);
     }
     
     QLabel {
@@ -73,10 +75,6 @@ def apply_iron_man_theme(app):
     
     QScrollBar::handle:vertical:hover {
         background: rgba(0, 217, 255, 0.5);
-    }
-    
-    QDialog {
-        background-color: #0A0E27;
     }
     """
     app.setStyleSheet(stylesheet)

@@ -1,5 +1,3 @@
-"""UI components"""
-
 from .theme import apply_iron_man_theme
 from .viewer import ViewerWidget
 from .project_manager import ProjectManager, Project
