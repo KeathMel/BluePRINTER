@@ -158,14 +158,20 @@ class BlueprintApp(QMainWindow):
                 delete = menu.addAction("Delete Project")
                 delete.triggered.connect(lambda: self.delete_item_popup(item))
             
-            elif item_type in ['file', 'folder']:
+            elif item_type == 'folder':
+                add_files = menu.addAction("Add Files")
+                add_files.triggered.connect(lambda: self.add_files_to_folder(item))
+                
                 add_folder = menu.addAction("Add Folder")
                 add_folder.triggered.connect(lambda: self.add_folder(item))
                 
                 menu.addSeparator()
                 
-                delete = menu.addAction("Delete")
+                delete = menu.addAction("Delete Folder")
                 delete.triggered.connect(lambda: self.delete_item_popup(item))
+            
+            elif item_type == 'file':
+                menu.addAction("Delete File").triggered.connect(lambda: self.delete_item_popup(item))
         else:
             new_proj = menu.addAction("New Project")
             new_proj.triggered.connect(self.create_project)
@@ -210,6 +216,19 @@ class BlueprintApp(QMainWindow):
         files, _ = QFileDialog.getOpenFileNames(self, "Select files")
         for f in files:
             project.add_file(f)
+        
+        self.refresh_projects()
+    
+    def add_files_to_folder(self, folder_item):
+        item_type, folder_path = folder_item.data(0, Qt.UserRole) or (None, None)
+        if item_type != 'folder':
+            return
+        
+        folder = Path(folder_path)
+        files, _ = QFileDialog.getOpenFileNames(self, "Select files")
+        for f in files:
+            import shutil
+            shutil.copy(f, folder / Path(f).name)
         
         self.refresh_projects()
     
