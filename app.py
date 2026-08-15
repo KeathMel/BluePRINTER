@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import json
+import shutil
 from pathlib import Path
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QPushButton, QFileDialog, QLabel, QLineEdit, QTextEdit,
@@ -57,30 +58,44 @@ class BlueprintApp(QMainWindow):
         self.viewer = ViewerWidget()
         self.viewer.marker_selected.connect(self.on_marker_selected)
         
-        # RIGHT - Annotations (hidden by default)
+        # RIGHT - Text/Marker Panel
         self.right_panel = QWidget()
         right_layout = QVBoxLayout(self.right_panel)
         
-        ann_title = QLabel("MARKER")
-        ann_title.setFont(QFont("Courier", 11, QFont.Bold))
-        ann_title.setStyleSheet("color: #7D3AFF;")
-        right_layout.addWidget(ann_title)
+        # Text file viewer
+        self.text_viewer = QTextEdit()
+        self.text_viewer.setReadOnly(True)
+        self.text_viewer.setVisible(False)
+        right_layout.addWidget(self.text_viewer)
         
-        right_layout.addWidget(QLabel("Title:"))
+        # Marker panel
+        self.marker_panel = QWidget()
+        marker_layout = QVBoxLayout(self.marker_panel)
+        
+        marker_title = QLabel("MARKER")
+        marker_title.setFont(QFont("Courier", 11, QFont.Bold))
+        marker_title.setStyleSheet("color: #7D3AFF;")
+        marker_layout.addWidget(marker_title)
+        
+        marker_layout.addWidget(QLabel("Title:"))
         self.marker_title = QLineEdit()
         self.marker_title.setPlaceholderText("Marker title...")
         self.marker_title.textChanged.connect(self.auto_save_marker)
-        right_layout.addWidget(self.marker_title)
+        marker_layout.addWidget(self.marker_title)
         
-        right_layout.addWidget(QLabel("Description:"))
+        marker_layout.addWidget(QLabel("Description:"))
         self.marker_desc = QTextEdit()
         self.marker_desc.setPlaceholderText("Marker description...")
         self.marker_desc.setMaximumHeight(200)
         self.marker_desc.textChanged.connect(self.auto_save_marker)
-        right_layout.addWidget(self.marker_desc)
+        marker_layout.addWidget(self.marker_desc)
+        
+        marker_layout.addStretch()
+        self.marker_panel.setLayout(marker_layout)
+        self.marker_panel.setVisible(False)
+        right_layout.addWidget(self.marker_panel)
         
         right_layout.addStretch()
-        self.right_panel.setVisible(False)
         
         # Main layout
         main_layout.addWidget(left_panel, 1)
@@ -95,6 +110,10 @@ class BlueprintApp(QMainWindow):
     def refresh_projects(self):
         self.tree.clear()
         for proj in self.project_manager.get_projects():
+            # Create markers folder
+            markers_folder = proj.path / "markers"
+            markers_folder.mkdir(exist_ok=True)
+            
             proj_item = QTreeWidgetItem(self.tree, [proj.name])
             proj_item.setData(0, Qt.UserRole, ('project', proj.name))
             self._add_tree_items(proj_item, proj.path)
@@ -107,7 +126,7 @@ class BlueprintApp(QMainWindow):
             
             for item in sorted(path.iterdir()):
                 try:
-                    if item.name.startswith('.') or item.name.endswith('.markers.json'):
+                    if item.name.startswith('.') or item.name == 'markers' or item.name.endswith('.markers.json'):
                         continue
                     
                     tree_item = QTreeWidgetItem(parent, [item.name])
@@ -131,12 +150,55 @@ class BlueprintApp(QMainWindow):
             self.current_project = self.project_manager.get_project(item_path)
             self.current_file = None
             self.viewer.clear()
-            self.right_panel.setVisible(False)
+            self.text_viewer.setText("")
+            self.text_viewer.setVisible(False)
+            self.marker_panel.setVisible(False)
         elif item_type == 'file':
             self.current_file = Path(item_path)
-            self.viewer.load_file(str(self.current_file))
-            self.load_markers()
-            self.right_panel.setVisible(False)
+            self.load_file_by_type()
+    
+    def load_file_by_type(self):
+        if not self.current_file:
+            return
+        
+        ext = self.current_file.suffix.lower()
+        
+        # Text files
+        if ext in ['.txt', '.py', '.js', '.md', '.json', '.xml', '.html', '.css']:
+            self.load_text_file()
+        # Image files
+        elif ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
+            self.load_image_file()
+        # 3D files
+        elif ext in ['.obj', '.glb', '.gltf']:
+            self.load_3d_file()
+        else:
+            self.viewer.clear()
+            self.text_viewer.setVisible(False)
+            self.marker_panel.setVisible(False)
+    
+    def load_text_file(self):
+        try:
+            with open(self.current_file, 'r') as f:
+                content = f.read()
+            self.text_viewer.setText(content)
+            self.text_viewer.setVisible(True)
+            self.viewer.clear()
+            self.marker_panel.setVisible(False)
+        except:
+            self.text_viewer.setText("Error reading file")
+            self.text_viewer.setVisible(True)
+    
+    def load_image_file(self):
+        self.text_viewer.setVisible(False)
+        self.marker_panel.setVisible(False)
+        self.viewer.load_file(str(self.current_file))
+        self.load_markers()
+    
+    def load_3d_file(self):
+        self.text_viewer.setVisible(False)
+        self.marker_panel.setVisible(False)
+        self.viewer.load_file(str(self.current_file))
     
     def on_right_click(self, pos):
         item = self.tree.itemAt(pos)
@@ -227,7 +289,6 @@ class BlueprintApp(QMainWindow):
         folder = Path(folder_path)
         files, _ = QFileDialog.getOpenFileNames(self, "Select files")
         for f in files:
-            import shutil
             shutil.copy(f, folder / Path(f).name)
         
         self.refresh_projects()
@@ -260,7 +321,6 @@ class BlueprintApp(QMainWindow):
                 project = self.project_manager.get_project(item_path)
                 folder_path = project.path / folder_name
             elif item_type in ['folder', 'file']:
-                # For files, create in parent folder
                 if item_type == 'file':
                     folder_path = Path(item_path).parent / folder_name
                 else:
@@ -292,7 +352,6 @@ class BlueprintApp(QMainWindow):
                                          f"Delete '{Path(item_path).name}'?",
                                          QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.Yes:
-                import shutil
                 path = Path(item_path)
                 if path.is_file():
                     path.unlink()
@@ -311,7 +370,8 @@ class BlueprintApp(QMainWindow):
         self.marker_title.blockSignals(False)
         self.marker_desc.blockSignals(False)
         
-        self.right_panel.setVisible(True)
+        self.text_viewer.setVisible(False)
+        self.marker_panel.setVisible(True)
     
     def auto_save_marker(self):
         if not self.selected_marker or not self.current_file:
@@ -323,10 +383,14 @@ class BlueprintApp(QMainWindow):
         self.save_markers()
     
     def load_markers(self):
-        if not self.current_file:
+        if not self.current_file or not self.current_project:
             return
         
-        json_path = Path(str(self.current_file) + ".markers.json")
+        markers_folder = self.current_project.path / "markers"
+        markers_folder.mkdir(exist_ok=True)
+        
+        file_hash = self.current_file.name.replace('.', '_')
+        json_path = markers_folder / f"{file_hash}.json"
         
         if json_path.exists():
             with open(json_path) as f:
@@ -334,10 +398,14 @@ class BlueprintApp(QMainWindow):
                 self.viewer.set_markers(markers)
     
     def save_markers(self):
-        if not self.current_file:
+        if not self.current_file or not self.current_project:
             return
         
-        json_path = Path(str(self.current_file) + ".markers.json")
+        markers_folder = self.current_project.path / "markers"
+        markers_folder.mkdir(exist_ok=True)
+        
+        file_hash = self.current_file.name.replace('.', '_')
+        json_path = markers_folder / f"{file_hash}.json"
         
         with open(json_path, 'w') as f:
             json.dump(self.viewer.markers, f, indent=2)
@@ -350,4 +418,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
