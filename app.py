@@ -102,17 +102,23 @@ class BlueprintApp(QMainWindow):
     
     def _add_tree_items(self, parent, path):
         try:
+            if not path.exists():
+                return
+            
             for item in sorted(path.iterdir()):
-                if item.name.startswith('.') or item.name.endswith('.markers.json'):
-                    continue
-                
-                tree_item = QTreeWidgetItem(parent, [item.name])
-                
-                if item.is_dir():
-                    tree_item.setData(0, Qt.UserRole, ('folder', str(item)))
-                    self._add_tree_items(tree_item, item)
-                else:
-                    tree_item.setData(0, Qt.UserRole, ('file', str(item)))
+                try:
+                    if item.name.startswith('.') or item.name.endswith('.markers.json'):
+                        continue
+                    
+                    tree_item = QTreeWidgetItem(parent, [item.name])
+                    
+                    if item.is_dir():
+                        tree_item.setData(0, Qt.UserRole, ('folder', str(item)))
+                        self._add_tree_items(tree_item, item)
+                    elif item.is_file():
+                        tree_item.setData(0, Qt.UserRole, ('file', str(item)))
+                except:
+                    pass
         except:
             pass
     
@@ -224,17 +230,32 @@ class BlueprintApp(QMainWindow):
         dialog.exec_()
     
     def _add_folder(self, item, folder_name, dialog):
-        item_type, item_path = item.data(0, Qt.UserRole) or (None, None)
-        
-        if item_type == 'project':
-            project = self.project_manager.get_project(item_path)
-            folder_path = project.path / folder_name
-        else:
-            folder_path = Path(item_path) / folder_name
-        
-        folder_path.mkdir(parents=True, exist_ok=True)
-        self.refresh_projects()
-        dialog.close()
+        try:
+            item_type, item_path = item.data(0, Qt.UserRole) or (None, None)
+            
+            if not folder_name:
+                dialog.close()
+                return
+            
+            if item_type == 'project':
+                project = self.project_manager.get_project(item_path)
+                folder_path = project.path / folder_name
+            elif item_type in ['folder', 'file']:
+                # For files, create in parent folder
+                if item_type == 'file':
+                    folder_path = Path(item_path).parent / folder_name
+                else:
+                    folder_path = Path(item_path) / folder_name
+            else:
+                dialog.close()
+                return
+            
+            folder_path.mkdir(parents=True, exist_ok=True)
+            dialog.close()
+            self.refresh_projects()
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to create folder: {e}")
+            dialog.close()
     
     def delete_item_popup(self, item):
         item_type, item_path = item.data(0, Qt.UserRole) or (None, None)
