@@ -3,9 +3,8 @@ import sys
 import json
 from pathlib import Path
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QListWidget, QListWidgetItem, QPushButton, 
-                             QFileDialog, QLabel, QLineEdit, QTextEdit,
-                             QDialog, QMessageBox, QTreeWidget, QTreeWidgetItem)
+                             QHBoxLayout, QPushButton, QFileDialog, QLabel, QLineEdit, QTextEdit,
+                             QDialog, QMessageBox, QTreeWidget, QTreeWidgetItem, QMenu)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QPixmap, QPainter, QBrush, QPen, QColor
 
@@ -23,6 +22,7 @@ class BlueprintApp(QMainWindow):
         self.current_project = None
         self.current_file = None
         self.selected_marker = None
+        self.selected_item = None
         
         self.init_ui()
         apply_iron_man_theme(self)
@@ -33,49 +33,25 @@ class BlueprintApp(QMainWindow):
         main_layout = QHBoxLayout(central)
         main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # LEFT - Projects
+        # LEFT - Projects/Files Tree
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
         
-        proj_title = QLabel("PROJECTS")
-        proj_title.setFont(QFont("Courier", 11, QFont.Bold))
-        proj_title.setStyleSheet("color: #00D9FF;")
-        left_layout.addWidget(proj_title)
+        tree_title = QLabel("PROJECTS & FILES")
+        tree_title.setFont(QFont("Courier", 11, QFont.Bold))
+        tree_title.setStyleSheet("color: #00D9FF;")
+        left_layout.addWidget(tree_title)
         
-        self.projects_list = QListWidget()
-        self.projects_list.itemClicked.connect(self.open_project)
-        left_layout.addWidget(self.projects_list)
+        self.tree = QTreeWidget()
+        self.tree.setHeaderLabels(["Name"])
+        self.tree.itemClicked.connect(self.on_item_selected)
+        self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self.on_right_click)
+        left_layout.addWidget(self.tree)
         
-        proj_buttons = QHBoxLayout()
-        btn_new = QPushButton("+ NEW")
-        btn_new.clicked.connect(self.create_project)
-        proj_buttons.addWidget(btn_new)
-        
-        btn_delete = QPushButton("🗑")
-        btn_delete.setMaximumWidth(50)
-        btn_delete.clicked.connect(self.delete_project)
-        proj_buttons.addWidget(btn_delete)
-        proj_buttons.addStretch()
-        
-        left_layout.addLayout(proj_buttons)
-        
-        # CENTER-LEFT - File Tree
-        tree_panel = QWidget()
-        tree_layout = QVBoxLayout(tree_panel)
-        
-        tree_title = QLabel("FILES")
-        tree_title.setFont(QFont("Courier", 10, QFont.Bold))
-        tree_title.setStyleSheet("color: #7D3AFF;")
-        tree_layout.addWidget(tree_title)
-        
-        self.file_tree = QTreeWidget()
-        self.file_tree.setHeaderLabels(["Name"])
-        self.file_tree.itemClicked.connect(self.on_file_selected)
-        tree_layout.addWidget(self.file_tree)
-        
-        btn_add_file = QPushButton("+ ADD FILE")
-        btn_add_file.clicked.connect(self.add_files_to_project)
-        tree_layout.addWidget(btn_add_file)
+        btn_new_proj = QPushButton("+ NEW PROJECT")
+        btn_new_proj.clicked.connect(self.create_project)
+        left_layout.addWidget(btn_new_proj)
         
         # CENTER - Viewer
         self.viewer = ViewerWidget()
@@ -103,25 +79,99 @@ class BlueprintApp(QMainWindow):
         self.marker_desc.textChanged.connect(self.auto_save_marker)
         right_layout.addWidget(self.marker_desc)
         
-        btn_delete_marker = QPushButton("DELETE MARKER")
-        btn_delete_marker.clicked.connect(self.delete_marker)
-        right_layout.addWidget(btn_delete_marker)
-        
         right_layout.addStretch()
         self.right_panel.setVisible(False)
         
         # Main layout
         main_layout.addWidget(left_panel, 1)
-        main_layout.addWidget(tree_panel, 1)
         main_layout.addWidget(self.viewer, 3)
         main_layout.addWidget(self.right_panel, 1)
         
         self.refresh_projects()
         
+        # Key press events
+        self.tree.keyPressEvent = self.on_key_press
+        
     def refresh_projects(self):
-        self.projects_list.clear()
+        self.tree.clear()
         for proj in self.project_manager.get_projects():
-            self.projects_list.addItem(QListWidgetItem(proj.name))
+            proj_item = QTreeWidgetItem(self.tree, [proj.name])
+            proj_item.setData(0, Qt.UserRole, ('project', proj.name))
+            self._add_tree_items(proj_item, proj.path)
+        self.tree.expandAll()
+    
+    def _add_tree_items(self, parent, path):
+        try:
+            for item in sorted(path.iterdir()):
+                if item.name.startswith('.') or item.name.endswith('.markers.json'):
+                    continue
+                
+                tree_item = QTreeWidgetItem(parent, [item.name])
+                
+                if item.is_dir():
+                    tree_item.setData(0, Qt.UserRole, ('folder', str(item)))
+                    self._add_tree_items(tree_item, item)
+                else:
+                    tree_item.setData(0, Qt.UserRole, ('file', str(item)))
+        except:
+            pass
+    
+    def on_item_selected(self, item):
+        self.selected_item = item
+        
+        item_type, item_path = item.data(0, Qt.UserRole) or (None, None)
+        
+        if item_type == 'project':
+            self.current_project = self.project_manager.get_project(item_path)
+            self.current_file = None
+            self.viewer.clear()
+            self.right_panel.setVisible(False)
+        elif item_type == 'file':
+            self.current_file = Path(item_path)
+            self.viewer.load_file(str(self.current_file))
+            self.load_markers()
+            self.right_panel.setVisible(False)
+    
+    def on_right_click(self, pos):
+        item = self.tree.itemAt(pos)
+        
+        menu = QMenu()
+        
+        if item:
+            item_type, item_path = item.data(0, Qt.UserRole) or (None, None)
+            
+            if item_type == 'project':
+                add_files = menu.addAction("Add Files")
+                add_files.triggered.connect(lambda: self.add_files_to_project(item))
+                
+                add_folder = menu.addAction("Add Folder")
+                add_folder.triggered.connect(lambda: self.add_folder(item))
+                
+                menu.addSeparator()
+                
+                delete = menu.addAction("Delete Project")
+                delete.triggered.connect(lambda: self.delete_item_popup(item))
+            
+            elif item_type in ['file', 'folder']:
+                add_folder = menu.addAction("Add Folder")
+                add_folder.triggered.connect(lambda: self.add_folder(item))
+                
+                menu.addSeparator()
+                
+                delete = menu.addAction("Delete")
+                delete.triggered.connect(lambda: self.delete_item_popup(item))
+        else:
+            new_proj = menu.addAction("New Project")
+            new_proj.triggered.connect(self.create_project)
+        
+        menu.exec_(self.tree.mapToGlobal(pos))
+    
+    def on_key_press(self, event):
+        if event.key() == Qt.Key_Delete:
+            if self.selected_item:
+                self.delete_item_popup(self.selected_item)
+        else:
+            QTreeWidget.keyPressEvent(self.tree, event)
     
     def create_project(self):
         dialog = QDialog(self)
@@ -145,88 +195,70 @@ class BlueprintApp(QMainWindow):
             self.refresh_projects()
             dialog.close()
     
-    def delete_project(self):
-        current = self.projects_list.currentItem()
-        if not current:
-            QMessageBox.warning(self, "Error", "Select a project first")
+    def add_files_to_project(self, proj_item):
+        item_type, proj_name = proj_item.data(0, Qt.UserRole) or (None, None)
+        if item_type != 'project':
             return
         
-        reply = QMessageBox.question(self, "Delete Project", 
-                                     f"Delete '{current.text()}'?",
-                                     QMessageBox.Yes | QMessageBox.No)
-        if reply == QMessageBox.Yes:
-            self.project_manager.delete_project(current.text())
-            self.current_project = None
-            self.file_tree.clear()
-            self.viewer.clear()
-            self.refresh_projects()
-    
-    def open_project(self, item):
-        self.current_project = self.project_manager.get_project(item.text())
-        self.load_file_tree()
-        self.viewer.clear()
-    
-    def load_file_tree(self):
-        self.file_tree.clear()
-        
-        if not self.current_project:
-            return
-        
-        root = QTreeWidgetItem(self.file_tree, [self.current_project.name])
-        self._add_tree_items(root, self.current_project.path)
-        self.file_tree.expandAll()
-    
-    def _add_tree_items(self, parent, path):
-        try:
-            for item in sorted(path.iterdir()):
-                if item.name.startswith('.'):
-                    continue
-                
-                tree_item = QTreeWidgetItem(parent, [item.name])
-                
-                if item.is_dir():
-                    self._add_tree_items(tree_item, item)
-        except:
-            pass
-    
-    def on_file_selected(self, item):
-        if not self.current_project:
-            return
-        
-        path_parts = []
-        current = item
-        
-        while current:
-            path_parts.insert(0, current.text(0))
-            current = current.parent()
-        
-        # Skip root project name
-        if path_parts and path_parts[0] == self.current_project.name:
-            path_parts = path_parts[1:]
-        
-        if not path_parts:
-            return
-        
-        file_path = self.current_project.path
-        for part in path_parts:
-            file_path = file_path / part
-        
-        if file_path.is_file():
-            self.current_file = file_path
-            self.viewer.load_file(str(file_path))
-            self.load_markers()
-            self.right_panel.setVisible(False)
-    
-    def add_files_to_project(self):
-        if not self.current_project:
-            QMessageBox.warning(self, "Error", "Select a project first")
-            return
-        
+        project = self.project_manager.get_project(proj_name)
         files, _ = QFileDialog.getOpenFileNames(self, "Select files")
         for f in files:
-            self.current_project.add_file(f)
+            project.add_file(f)
         
-        self.load_file_tree()
+        self.refresh_projects()
+    
+    def add_folder(self, item):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("New Folder")
+        layout = QVBoxLayout()
+        
+        layout.addWidget(QLabel("Folder Name:"))
+        name_input = QLineEdit()
+        layout.addWidget(name_input)
+        
+        btn = QPushButton("Create")
+        btn.clicked.connect(lambda: self._add_folder(item, name_input.text(), dialog))
+        layout.addWidget(btn)
+        
+        dialog.setLayout(layout)
+        dialog.exec_()
+    
+    def _add_folder(self, item, folder_name, dialog):
+        item_type, item_path = item.data(0, Qt.UserRole) or (None, None)
+        
+        if item_type == 'project':
+            project = self.project_manager.get_project(item_path)
+            folder_path = project.path / folder_name
+        else:
+            folder_path = Path(item_path) / folder_name
+        
+        folder_path.mkdir(parents=True, exist_ok=True)
+        self.refresh_projects()
+        dialog.close()
+    
+    def delete_item_popup(self, item):
+        item_type, item_path = item.data(0, Qt.UserRole) or (None, None)
+        
+        if item_type == 'project':
+            reply = QMessageBox.question(self, "Delete Project", 
+                                         f"Delete '{item_path}'?",
+                                         QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.project_manager.delete_project(item_path)
+                self.refresh_projects()
+        
+        elif item_type in ['file', 'folder']:
+            reply = QMessageBox.question(self, "Delete", 
+                                         f"Delete '{Path(item_path).name}'?",
+                                         QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                import shutil
+                path = Path(item_path)
+                if path.is_file():
+                    path.unlink()
+                elif path.is_dir():
+                    shutil.rmtree(path)
+                self.refresh_projects()
     
     def on_marker_selected(self, marker_data):
         self.selected_marker = marker_data
@@ -269,14 +301,6 @@ class BlueprintApp(QMainWindow):
         
         with open(json_path, 'w') as f:
             json.dump(self.viewer.markers, f, indent=2)
-    
-    def delete_marker(self):
-        if self.selected_marker and self.current_file:
-            self.viewer.markers.remove(self.selected_marker)
-            self.save_markers()
-            self.viewer.refresh_display()
-            self.right_panel.setVisible(False)
-            self.selected_marker = None
 
 def main():
     app = QApplication(sys.argv)
@@ -286,3 +310,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
