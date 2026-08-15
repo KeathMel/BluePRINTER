@@ -1,4 +1,8 @@
-
+from pathlib import Path
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PyQt5.QtGui import QPixmap, QColor, QPainter, QBrush, QPen, QFont
+from PyQt5.QtCore import Qt, pyqtSignal, QRect
+import math
 
 class ViewerWidget(QWidget):
     marker_selected = pyqtSignal(dict)
@@ -39,9 +43,6 @@ class ViewerWidget(QWidget):
         if ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
             self.load_image(file_path)
             self.file_type = 'image'
-        elif ext in ['.obj', '.glb', '.gltf']:
-            self.load_3d(file_path)
-            self.file_type = '3d'
         else:
             self.viewer_label.setText(f"Unsupported: {ext}")
     
@@ -59,10 +60,6 @@ class ViewerWidget(QWidget):
         self.scale_y = self.original_pixmap.height() / self.display_pixmap.height()
         
         self.refresh_display()
-    
-    def load_3d(self, file_path):
-        self.viewer_label.setText(f"3D Model: {self.current_file.name}\n\n[3D viewer coming soon]")
-        self.viewer_label.setStyleSheet("background-color: #0A0E27; color: #00D9FF; font-family: 'Courier New'; font-size: 14px;")
     
     def refresh_display(self):
         if not self.display_pixmap:
@@ -89,7 +86,6 @@ class ViewerWidget(QWidget):
         painter.end()
         self.viewer_label.setPixmap(pixmap)
         
-        # Calculate pixmap rect for coordinate mapping
         pm = self.viewer_label.pixmap()
         if pm:
             label_rect = self.viewer_label.rect()
@@ -100,12 +96,9 @@ class ViewerWidget(QWidget):
             self.pixmap_rect = QRect(int(x_offset), int(y_offset), pm_width, pm_height)
     
     def screen_to_image_coords(self, screen_x, screen_y):
-        """Convert screen coordinates to original image coordinates"""
-        # Map screen coords to display pixmap coords
         pm_x = screen_x - self.pixmap_rect.x()
         pm_y = screen_y - self.pixmap_rect.y()
         
-        # Map display pixmap coords to original image coords
         orig_x = pm_x * self.scale_x
         orig_y = pm_y * self.scale_y
         
@@ -119,7 +112,6 @@ class ViewerWidget(QWidget):
         if self.file_type != 'image' or not self.display_pixmap:
             return
         
-        # LEFT CLICK: Select marker
         orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
         
         for marker in self.markers:
@@ -136,7 +128,6 @@ class ViewerWidget(QWidget):
         if self.file_type != 'image' or not self.display_pixmap:
             return
         
-        # RIGHT CLICK: Create new marker
         orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
         
         marker = {
