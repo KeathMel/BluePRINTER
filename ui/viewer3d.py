@@ -6,6 +6,20 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 import numpy as np
 
+# Monkey-patch pkgutil for Python 3.14 trimesh compatibility
+import pkgutil
+if not hasattr(pkgutil, 'find_loader'):
+    def find_loader(name):
+        spec = __import__('importlib.util').util.find_spec(name)
+        return spec.loader if spec else None
+    pkgutil.find_loader = find_loader
+
+try:
+    import trimesh
+    HAS_TRIMESH = True
+except:
+    HAS_TRIMESH = False
+
 class Viewer3D(QOpenGLWidget):
     marker_selected = pyqtSignal(dict)
     
@@ -13,9 +27,11 @@ class Viewer3D(QOpenGLWidget):
         super().__init__()
         self.markers = []
         self.dragging_marker = None
+        self.model_vertices = None
+        self.model_faces = None
         self.camera_rot_x = 20
         self.camera_rot_y = 45
-        self.camera_zoom = 50
+        self.camera_zoom = 15  # Closer to center
         
         fmt = QSurfaceFormat()
         fmt.setVersion(2, 1)
@@ -51,7 +67,10 @@ class Viewer3D(QOpenGLWidget):
         glRotatef(self.camera_rot_x, 1, 0, 0)
         glRotatef(self.camera_rot_y, 0, 1, 0)
         
-        # Draw markers as small 3D balls
+        if self.model_vertices is not None and self.model_faces is not None:
+            self.draw_model()
+        
+        # Draw markers
         glColor3f(0, 0.85, 1)
         for marker in self.markers:
             x = marker.get('position', {}).get('x', 0)
@@ -64,9 +83,52 @@ class Viewer3D(QOpenGLWidget):
             gluSphere(quad, 0.15, 6, 6)
             glPopMatrix()
     
+    def draw_model(self):
+        if self.model_vertices is None or self.model_faces is None:
+            return
+        
+        glColor3f(0.2, 0.8, 1)
+        glBegin(GL_TRIANGLES)
+        
+        for face in self.model_faces:
+            try:
+                for vertex_idx in face:
+                    v = self.model_vertices[vertex_idx]
+                    glVertex3f(float(v[0]), float(v[1]), float(v[2]))
+            except:
+                pass
+        
+        glEnd()
+    
     def load_file(self, file_path):
-        # Placeholder - 3D model loading coming soon
-        pass
+        if not HAS_TRIMESH:
+            return
+        
+        try:
+            mesh = trimesh.load(str(file_path))
+            
+            if isinstance(mesh, trimesh.Scene):
+                meshes = list(mesh.geometry.values())
+                if meshes:
+                    mesh = trimesh.util.concatenate(meshes)
+            elif isinstance(mesh, list):
+                mesh = trimesh.util.concatenate(mesh)
+            
+            # Center and scale
+            mesh.apply_translation(-mesh.centroid)
+            bounds = mesh.bounds
+            if (bounds[1] - bounds[0]).max() > 0:
+                scale = 5.0 / (bounds[1] - bounds[0]).max()
+                mesh.apply_scale(scale)
+            
+            self.model_vertices = np.array(mesh.vertices, dtype=np.float32)
+            self.model_faces = np.array(mesh.faces, dtype=np.uint32)
+            
+            self.update()
+        except Exception as e:
+            print(f"Error loading 3D: {e}")
+            self.model_vertices = None
+            self.model_faces = None
     
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
@@ -112,6 +174,8 @@ class Viewer3D(QOpenGLWidget):
         self.update()
     
     def clear(self):
+        self.model_vertices = None
+        self.model_faces = None
         self.markers = []
         self.dragging_marker = None
         self.update()
