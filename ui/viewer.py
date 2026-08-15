@@ -1,8 +1,4 @@
-from pathlib import Path
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
-from PyQt5.QtGui import QPixmap, QColor, QPainter, QBrush, QPen, QFont
-from PyQt5.QtCore import Qt, pyqtSignal, QRect
-import math
+
 
 class ViewerWidget(QWidget):
     marker_selected = pyqtSignal(dict)

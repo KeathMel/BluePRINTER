@@ -9,9 +9,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
-from ui.theme import apply_iron_man_theme
-from ui.viewer import ViewerWidget
-from ui.project_manager import ProjectManager
+
 
 class BlueprintApp(QMainWindow):
     def __init__(self):
@@ -216,10 +214,7 @@ class BlueprintApp(QMainWindow):
         self.viewer.load_file(str(self.current_file), self.current_project)
         self.load_markers()
     
-    def load_3d_file(self):
-        self.text_editor.setVisible(False)
-        self.marker_panel.setVisible(False)
-        self.viewer.load_file(str(self.current_file), self.current_project)
+
     
     def on_right_click(self, pos):
         item = self.tree.itemAt(pos)
