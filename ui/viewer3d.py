@@ -5,12 +5,6 @@ from PyQt5.QtGui import QSurfaceFormat
 from OpenGL.GL import *
 from OpenGL.GLU import *
 import numpy as np
-import math
-
-try:
-    import trimesh
-except:
-    trimesh = None
 
 class Viewer3D(QOpenGLWidget):
     marker_selected = pyqtSignal(dict)
@@ -19,8 +13,6 @@ class Viewer3D(QOpenGLWidget):
         super().__init__()
         self.markers = []
         self.dragging_marker = None
-        self.model_vertices = None
-        self.model_faces = None
         self.camera_rot_x = 20
         self.camera_rot_y = 45
         self.camera_zoom = 50
@@ -59,9 +51,6 @@ class Viewer3D(QOpenGLWidget):
         glRotatef(self.camera_rot_x, 1, 0, 0)
         glRotatef(self.camera_rot_y, 0, 1, 0)
         
-        if self.model_vertices is not None and self.model_faces is not None:
-            self.draw_model()
-        
         # Draw markers as small 3D balls
         glColor3f(0, 0.85, 1)
         for marker in self.markers:
@@ -75,62 +64,9 @@ class Viewer3D(QOpenGLWidget):
             gluSphere(quad, 0.15, 6, 6)
             glPopMatrix()
     
-    def draw_model(self):
-        if self.model_vertices is None or self.model_faces is None:
-            return
-        
-        glColor3f(0.2, 0.8, 1)
-        glBegin(GL_TRIANGLES)
-        
-        for face in self.model_faces:
-            try:
-                for vertex_idx in face:
-                    v = self.model_vertices[vertex_idx]
-                    glVertex3f(float(v[0]), float(v[1]), float(v[2]))
-            except:
-                pass
-        
-        glEnd()
-    
     def load_file(self, file_path):
-        if not trimesh:
-            return
-        
-        try:
-            print(f"Loading 3D model: {file_path}")
-            mesh = trimesh.load(str(file_path))
-            print(f"Loaded mesh type: {type(mesh)}")
-            
-            # Handle different mesh types
-            if isinstance(mesh, trimesh.Scene):
-                print("Mesh is Scene, extracting geometry")
-                meshes = list(mesh.geometry.values())
-                if meshes:
-                    mesh = trimesh.util.concatenate(meshes)
-            elif isinstance(mesh, list):
-                print("Mesh is list, concatenating")
-                mesh = trimesh.util.concatenate(mesh)
-            
-            print(f"Mesh vertices: {mesh.vertices.shape}, faces: {mesh.faces.shape}")
-            
-            # Center and normalize
-            mesh.apply_translation(-mesh.centroid)
-            bounds = mesh.bounds
-            scale = 10.0 / (bounds[1] - bounds[0]).max()
-            mesh.apply_scale(scale)
-            
-            # Store data
-            self.model_vertices = np.array(mesh.vertices, dtype=np.float32)
-            self.model_faces = np.array(mesh.faces, dtype=np.uint32)
-            
-            print(f"Successfully loaded 3D model")
-            self.update()
-        except Exception as e:
-            print(f"Error loading 3D model: {e}")
-            import traceback
-            traceback.print_exc()
-            self.model_vertices = None
-            self.model_faces = None
+        # Placeholder - 3D model loading coming soon
+        pass
     
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
@@ -143,12 +79,7 @@ class Viewer3D(QOpenGLWidget):
             self.marker_selected.emit(marker)
             self.dragging_marker = marker
         elif event.button() == Qt.LeftButton:
-            # Check if clicking marker
             for marker in self.markers:
-                mx = marker.get('position', {}).get('x', 0)
-                my = marker.get('position', {}).get('y', 0)
-                mz = marker.get('position', {}).get('z', 0)
-                # Simple distance check in screen space
                 self.dragging_marker = marker
                 self.marker_selected.emit(marker)
                 break
@@ -164,7 +95,6 @@ class Viewer3D(QOpenGLWidget):
             self.camera_rot_y += dx * 0.5
             self.camera_rot_x += dy * 0.5
         elif event.buttons() & Qt.LeftButton and self.dragging_marker:
-            # Move marker in 3D space
             self.dragging_marker['position']['x'] += dx * 0.1
             self.dragging_marker['position']['y'] -= dy * 0.1
         
@@ -182,8 +112,6 @@ class Viewer3D(QOpenGLWidget):
         self.update()
     
     def clear(self):
-        self.model_vertices = None
-        self.model_faces = None
         self.markers = []
         self.dragging_marker = None
         self.update()
