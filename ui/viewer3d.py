@@ -1,10 +1,9 @@
 from pathlib import Path
-from PyQt5.QtWidgets import QOpenGLWidget, QWidget, QVBoxLayout, QLabel
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from PyQt5.QtGui import QSurfaceFormat, QColor
+from PyQt5.QtWidgets import QOpenGLWidget
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QSurfaceFormat
 from OpenGL.GL import *
 from OpenGL.GLU import *
-import math
 import numpy as np
 
 try:
@@ -19,9 +18,11 @@ class Viewer3D(QOpenGLWidget):
         super().__init__()
         self.markers = []
         self.model = None
+        self.model_vertices = None
+        self.model_faces = None
         self.camera_rot_x = 20
         self.camera_rot_y = 45
-        self.camera_zoom = 30
+        self.camera_zoom = 50
         
         fmt = QSurfaceFormat()
         fmt.setVersion(2, 1)
@@ -57,12 +58,12 @@ class Viewer3D(QOpenGLWidget):
         glRotatef(self.camera_rot_x, 1, 0, 0)
         glRotatef(self.camera_rot_y, 0, 1, 0)
         
-        if self.model:
+        if self.model_vertices is not None:
             self.draw_model()
         else:
             self.draw_default_cube()
         
-        # Draw markers as 3D balls
+        # Draw markers as SMALL 3D balls
         glColor3f(0, 0.85, 1)
         for marker in self.markers:
             x = marker.get('position', {}).get('x', 0)
@@ -72,20 +73,21 @@ class Viewer3D(QOpenGLWidget):
             glPushMatrix()
             glTranslatef(x, y, z)
             quad = gluNewQuadric()
-            gluSphere(quad, 0.5, 8, 8)
+            gluSphere(quad, 0.2, 6, 6)  # Smaller size
             glPopMatrix()
     
     def draw_model(self):
-        if not self.model:
+        if self.model_vertices is None or self.model_faces is None:
             return
         
         glColor3f(0.2, 0.8, 1)
         glBegin(GL_TRIANGLES)
         
-        for face in self.model.faces:
+        for face in self.model_faces:
             for vertex_idx in face:
-                v = self.model.vertices[vertex_idx]
-                glVertex3fv(v)
+                if vertex_idx < len(self.model_vertices):
+                    v = self.model_vertices[vertex_idx]
+                    glVertex3f(v[0], v[1], v[2])
         
         glEnd()
     
@@ -112,12 +114,24 @@ class Viewer3D(QOpenGLWidget):
             return
         
         try:
-            self.model = trimesh.load(str(file_path))
-            # Center model
-            self.model.apply_translation(-self.model.centroid)
+            mesh = trimesh.load(str(file_path))
+            
+            # Handle mesh collections
+            if isinstance(mesh, trimesh.Scene):
+                mesh = mesh.geometry[next(iter(mesh.geometry))]
+            
+            # Center and scale model
+            mesh.apply_translation(-mesh.centroid)
+            
+            # Store vertices and faces
+            self.model_vertices = np.array(mesh.vertices, dtype=np.float32)
+            self.model_faces = np.array(mesh.faces, dtype=np.uint32)
+            
             self.update()
-        except:
-            self.model = None
+        except Exception as e:
+            print(f"Error loading 3D model: {e}")
+            self.model_vertices = None
+            self.model_faces = None
     
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
@@ -155,5 +169,7 @@ class Viewer3D(QOpenGLWidget):
     
     def clear(self):
         self.model = None
+        self.model_vertices = None
+        self.model_faces = None
         self.markers = []
         self.update()
