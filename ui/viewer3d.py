@@ -129,7 +129,7 @@ class Viewer3D(QOpenGLWidget):
             bounds = mesh.bounds
             print(f"[3D] Bounds: {bounds}")
             if (bounds[1] - bounds[0]).max() > 0:
-                scale = 5.0 / (bounds[1] - bounds[0]).max()
+                scale = 30.0 / (bounds[1] - bounds[0]).max()  # Bigger scale
                 mesh.apply_scale(scale)
                 print(f"[3D] Scaled by {scale}")
             
