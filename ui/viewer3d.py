@@ -163,7 +163,9 @@ class GL3DCanvas(QOpenGLWidget):
         if self.model_vertices is not None:
             self.draw_model()
         
-        # Draw markers
+        # Draw markers ALWAYS ON TOP - disable depth test so they're never
+        # hidden inside the model, and make them big enough to see.
+        glDisable(GL_DEPTH_TEST)
         glColor3f(0.9, 0.07, 0.14)
         for marker in self.markers:
             x = marker.get('position', {}).get('x', 0)
@@ -174,8 +176,9 @@ class GL3DCanvas(QOpenGLWidget):
             glPushMatrix()
             glTranslatef(x, y, z)
             quad = gluNewQuadric()
-            gluSphere(quad, 0.15 * scale, 8, 8)
+            gluSphere(quad, 0.25 * scale, 12, 12)
             glPopMatrix()
+        glEnable(GL_DEPTH_TEST)
     
     def draw_model(self):
         # Solid filled triangles with precomputed shading
@@ -273,12 +276,13 @@ class GL3DCanvas(QOpenGLWidget):
             marker = {
                 'title': 'Marker',
                 'description': '',
-                'position': {'x': 0, 'y': 0, 'z': 0},
+                'position': {'x': 0, 'y': 0, 'z': 3.0},
                 'scale': 1.0
             }
             self.markers.append(marker)
             self.selected_marker = marker
             self.marker_selected.emit(marker)
+            self.update()
         elif event.button() == Qt.LeftButton:
             if self.markers:
                 for marker in reversed(self.markers):
