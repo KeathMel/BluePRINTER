@@ -306,20 +306,18 @@ class GL3DCanvas(QOpenGLWidget):
             self.camera_rot_x += dy * 0.5
         elif event.buttons() & Qt.LeftButton and self.dragging and self.selected_marker:
             # Move marker in the camera's screen plane so it follows the cursor
-            # regardless of how the camera is rotated.
+            # regardless of how the camera is rotated. Derived from the inverse
+            # of the view rotation (Rx * Ry), so screen X/Y map to world space.
             speed = 0.005 * self.camera_zoom / self.model_display_scale
             
             rx = np.radians(self.camera_rot_x)
             ry = np.radians(self.camera_rot_y)
+            cx, sx = np.cos(rx), np.sin(rx)
+            cy, sy = np.cos(ry), np.sin(ry)
             
-            # Camera "right" vector in world space (screen X drag)
-            right = np.array([np.cos(ry), 0, -np.sin(ry)])
-            # Camera "up" vector in world space (screen Y drag)
-            up = np.array([
-                np.sin(ry) * np.sin(rx),
-                np.cos(rx),
-                np.cos(ry) * np.sin(rx),
-            ])
+            # (Rx @ Ry)^T columns give world-space screen-right and screen-up
+            right = np.array([cy, 0.0, sy])
+            up = np.array([sx * sy, cx, -sx * cy])
             
             move = right * (dx * speed) - up * (dy * speed)
             
