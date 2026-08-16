@@ -125,6 +125,7 @@ class GL3DCanvas(QOpenGLWidget):
         self.markers = []
         self.selected_marker = None
         self.dragging = False
+        self.drag_depth = 0.5
         self.model_vertices = None
         self.model_faces = None
         self.face_shades = None
@@ -286,6 +287,21 @@ class GL3DCanvas(QOpenGLWidget):
         except Exception:
             return None
 
+    def marker_screen_pos(self, x, y, z):
+        """Return (screen_x, screen_y, depth) for a world point, with the
+        camera transform applied. Depth is the value gluUnProject needs."""
+        self.makeCurrent()
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+        glTranslatef(0, 0, -self.camera_zoom)
+        glRotatef(self.camera_rot_x, 1, 0, 0)
+        glRotatef(self.camera_rot_y, 0, 1, 0)
+        glScalef(self.model_display_scale, self.model_display_scale, self.model_display_scale)
+        result = self.project_to_screen(x, y, z)
+        glPopMatrix()
+        return result
+
     def marker_at_screen(self, click_x, click_y):
         """Return the marker whose projected screen position is nearest the
         click within a pixel threshold, or None."""
@@ -315,6 +331,30 @@ class GL3DCanvas(QOpenGLWidget):
         glPopMatrix()
         return best
 
+    def unproject_at_depth(self, screen_x, screen_y, depth):
+        """Convert a 2D screen point + a captured depth into a 3D world point,
+        using the same camera transform as paintGL. Makes markers stick to the cursor."""
+        self.makeCurrent()
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+        glTranslatef(0, 0, -self.camera_zoom)
+        glRotatef(self.camera_rot_x, 1, 0, 0)
+        glRotatef(self.camera_rot_y, 0, 1, 0)
+        glScalef(self.model_display_scale, self.model_display_scale, self.model_display_scale)
+        try:
+            modelview = glGetDoublev(GL_MODELVIEW_MATRIX)
+            projection = glGetDoublev(GL_PROJECTION_MATRIX)
+            viewport = glGetIntegerv(GL_VIEWPORT)
+            # Qt y is top-down; OpenGL y is bottom-up
+            gl_y = viewport[3] - screen_y
+            world = gluUnProject(screen_x, gl_y, depth, modelview, projection, viewport)
+            glPopMatrix()
+            return world
+        except Exception:
+            glPopMatrix()
+            return None
+
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
             marker = {
@@ -333,6 +373,11 @@ class GL3DCanvas(QOpenGLWidget):
             if hit is not None:
                 self.selected_marker = hit
                 self.dragging = True
+                # Capture the marker's screen depth so we can unproject the
+                # cursor to the same depth while dragging (marker sticks to mouse)
+                p = hit.get('position', {})
+                screen = self.marker_screen_pos(p.get('x', 0), p.get('y', 0), p.get('z', 0))
+                self.drag_depth = screen[2] if screen else 0.5
                 self.marker_selected.emit(hit)
             else:
                 self.selected_marker = None
@@ -349,25 +394,13 @@ class GL3DCanvas(QOpenGLWidget):
             self.camera_rot_y += dx * 0.5
             self.camera_rot_x += dy * 0.5
         elif event.buttons() & Qt.LeftButton and self.dragging and self.selected_marker:
-            # Move marker in the camera's screen plane so it follows the cursor
-            # regardless of how the camera is rotated. Derived from the inverse
-            # of the view rotation (Rx * Ry), so screen X/Y map to world space.
-            speed = 0.005 * self.camera_zoom / self.model_display_scale
-            
-            rx = np.radians(self.camera_rot_x)
-            ry = np.radians(self.camera_rot_y)
-            cx, sx = np.cos(rx), np.sin(rx)
-            cy, sy = np.cos(ry), np.sin(ry)
-            
-            # (Rx @ Ry)^T columns give world-space screen-right and screen-up
-            right = np.array([cy, 0.0, sy])
-            up = np.array([sx * sy, cx, -sx * cy])
-            
-            move = right * (dx * speed) - up * (dy * speed)
-            
-            self.selected_marker['position']['x'] += float(move[0])
-            self.selected_marker['position']['y'] += float(move[1])
-            self.selected_marker['position']['z'] += float(move[2])
+            # Unproject the cursor at the marker's captured screen depth so the
+            # marker sticks exactly under the mouse.
+            world = self.unproject_at_depth(event.x(), event.y(), self.drag_depth)
+            if world is not None:
+                self.selected_marker['position']['x'] = float(world[0])
+                self.selected_marker['position']['y'] = float(world[1])
+                self.selected_marker['position']['z'] = float(world[2])
         
         self.last_x = event.x()
         self.last_y = event.y()
