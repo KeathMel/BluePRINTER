@@ -67,25 +67,9 @@ class BlueprintApp(QMainWindow):
         self.viewer3d.setVisible(False)
         center_layout.addWidget(self.viewer3d)
         
-        from PyQt5.QtWidgets import QTextEdit
-        from PyQt5.QtGui import QFont as _QFont
-        self.text_editor = QTextEdit()
+        from ui.code_editor import CodeEditor
+        self.text_editor = CodeEditor()
         self.text_editor.setVisible(False)
-        editor_font = _QFont("Consolas", 11)
-        editor_font.setStyleHint(_QFont.Monospace)
-        self.text_editor.setFont(editor_font)
-        self.text_editor.setStyleSheet(
-            "QTextEdit {"
-            " background-color: #ffffff;"
-            " color: #1d1d1d;"
-            " border: 2px solid #000000;"
-            " border-radius: 0px;"
-            " padding: 16px;"
-            " selection-background-color: #2d89ef;"
-            " selection-color: #ffffff;"
-            "}"
-        )
-        self.text_editor.setLineWrapMode(QTextEdit.WidgetWidth)
         center_layout.addWidget(self.text_editor)
         
         # RIGHT - Marker Panel

@@ -11,8 +11,8 @@ def apply_iron_man_theme(app):
     METRO_DARK_BLUE = "#2b5797"
     METRO_RED       = "#ee1111"
     METRO_DARK_RED  = "#b91d47"
-    BG              = "#ffffff"
-    PANEL           = "#ebebeb"
+    BG              = "#eceae2"
+    PANEL           = "#dcdad0"
     TEXT            = "#000000"
     LINE            = "#000000"   # Metro uses hard, visible edges
     HOVER           = "#2d89ef"
