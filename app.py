@@ -60,10 +60,12 @@ class BlueprintApp(QMainWindow):
         
         self.viewer = ViewerWidget()
         self.viewer.marker_selected.connect(self.on_marker_selected)
+        self.viewer.marker_moved.connect(self.save_markers)
         center_layout.addWidget(self.viewer)
         
         self.viewer3d = Viewer3D()
         self.viewer3d.marker_selected.connect(self.on_marker_selected)
+        self.viewer3d.marker_moved.connect(self.save_markers)
         self.viewer3d.setVisible(False)
         center_layout.addWidget(self.viewer3d)
         
@@ -194,9 +196,12 @@ class BlueprintApp(QMainWindow):
         markers = self.viewer3d.markers if self.viewer3d.isVisible() else self.viewer.markers
         self.marker_manager.markers = markers
         self.marker_manager.save_markers()
+        print(f"[SAVE] {len(markers)} markers -> {self.marker_manager.current_file.name}")
     
     def on_marker_selected(self, marker):
         self.marker_panel.set_marker(marker)
+        # Persist immediately - covers newly created markers
+        self.save_markers()
     
     def on_marker_deleted(self, marker):
         active = self.viewer3d if self.viewer3d.isVisible() else self.viewer

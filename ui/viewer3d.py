@@ -22,6 +22,7 @@ except:
 
 class Viewer3D(QWidget):
     marker_selected = pyqtSignal(dict)
+    marker_moved = pyqtSignal()
     
     def __init__(self):
         super().__init__()
@@ -61,6 +62,7 @@ class Viewer3D(QWidget):
         # OpenGL canvas - fills all available space
         self.gl_widget = GL3DCanvas()
         self.gl_widget.marker_selected.connect(self.on_marker_selected)
+        self.gl_widget.marker_moved.connect(self.marker_moved.emit)
         layout.addWidget(self.gl_widget, 1)
         
         # Scale slider bar at bottom of canvas (initially hidden)
@@ -116,6 +118,7 @@ class Viewer3D(QWidget):
 
 class GL3DCanvas(QOpenGLWidget):
     marker_selected = pyqtSignal(dict)
+    marker_moved = pyqtSignal()
     
     def __init__(self):
         super().__init__()
@@ -371,7 +374,10 @@ class GL3DCanvas(QOpenGLWidget):
         self.update()
     
     def mouseReleaseEvent(self, event):
+        was_dragging = self.dragging
         self.dragging = False
+        if was_dragging and self.selected_marker is not None:
+            self.marker_moved.emit()
     
     def wheelEvent(self, event):
         self.camera_zoom += event.angleDelta().y() / 120

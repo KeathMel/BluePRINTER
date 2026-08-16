@@ -6,6 +6,7 @@ import math
 
 class ViewerWidget(QWidget):
     marker_selected = pyqtSignal(dict)
+    marker_moved = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -147,7 +148,10 @@ class ViewerWidget(QWidget):
             self.marker_selected.emit(self.selected_marker)
 
     def on_mouse_release(self, event):
+        was_dragging = self.dragging
         self.dragging = False
+        if was_dragging and self.selected_marker is not None:
+            self.marker_moved.emit()
 
     def clear(self):
         self.current_file = None
