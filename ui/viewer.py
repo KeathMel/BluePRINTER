@@ -64,7 +64,6 @@ class ViewerWidget(QWidget):
     
     def refresh_display(self):
         if not self.display_pixmap:
-            print("[ERROR] No display pixmap!")
             return
         
         pixmap = self.display_pixmap.copy()
@@ -116,7 +115,14 @@ class ViewerWidget(QWidget):
         if self.file_type != 'image' or not self.display_pixmap:
             return
         
+        # ONLY handle left-click here. Right-click is handled by contextMenuEvent.
+        if event.button() != Qt.LeftButton:
+            return
+        
         orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
+        
+        # Hit radius in original image coords - generous for easy clicking
+        hit_radius = 30 * self.scale_x
         
         # Check from newest to oldest marker
         clicked = False
@@ -125,7 +131,7 @@ class ViewerWidget(QWidget):
             my = marker.get('position', {}).get('y', 0)
             
             dist = math.sqrt((orig_x - mx)**2 + (orig_y - my)**2)
-            if dist < 50 * self.scale_x:
+            if dist < hit_radius:
                 self.selected_marker = marker
                 self.dragging = True
                 self.marker_selected.emit(marker)
