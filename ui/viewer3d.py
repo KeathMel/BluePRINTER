@@ -204,14 +204,23 @@ class GL3DCanvas(QOpenGLWidget):
             elif isinstance(mesh, list):
                 mesh = trimesh.util.concatenate(mesh)
             
-            mesh.apply_translation(-mesh.centroid)
-            bounds = mesh.bounds
-            if (bounds[1] - bounds[0]).max() > 0:
-                scale = 5.0 / (bounds[1] - bounds[0]).max()
-                mesh.apply_scale(scale)
+            verts = np.array(mesh.vertices, dtype=np.float32)
+            faces = np.array(mesh.faces, dtype=np.uint32)
             
-            self.model_vertices = np.array(mesh.vertices, dtype=np.float32)
-            self.model_faces = np.array(mesh.faces, dtype=np.uint32)
+            # Center on the median vertex (robust to outliers)
+            center = np.median(verts, axis=0)
+            verts = verts - center
+            
+            # Scale using the 2nd..98th percentile extent so a few stray
+            # outlier vertices can't shrink the real model to a dot.
+            lo = np.percentile(verts, 2, axis=0)
+            hi = np.percentile(verts, 98, axis=0)
+            extent = float(np.max(hi - lo))
+            if extent > 0:
+                verts = verts * (5.0 / extent)
+            
+            self.model_vertices = verts
+            self.model_faces = faces
             self.model_display_scale = 1.0
             
             # Precompute flat shading per face (vectorized)
@@ -229,7 +238,7 @@ class GL3DCanvas(QOpenGLWidget):
             shades = np.abs(normals @ light)
             self.face_shades = (0.35 + 0.65 * shades).astype(np.float32)
             
-            print(f"[3D] Loaded: {len(self.model_vertices)} verts, {len(self.model_faces)} faces")
+            print(f"[3D] Loaded: {len(self.model_vertices)} verts, {len(self.model_faces)} faces, extent={extent:.3f}")
             self.update()
         except Exception as e:
             import traceback
