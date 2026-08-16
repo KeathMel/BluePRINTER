@@ -1,5 +1,5 @@
 from pathlib import Path
-from PyQt5.QtWidgets import QOpenGLWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QWidget
+from PyQt5.QtWidgets import QOpenGLWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QWidget, QSizePolicy
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QSurfaceFormat
 from OpenGL.GL import *
@@ -26,6 +26,7 @@ class Viewer3D(QWidget):
     def __init__(self):
         super().__init__()
         self.init_ui()
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     
     # All marker state lives on the canvas - these delegate to it
     @property
@@ -55,16 +56,18 @@ class Viewer3D(QWidget):
     def init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         
-        # OpenGL canvas
+        # OpenGL canvas - fills all available space
         self.gl_widget = GL3DCanvas()
         self.gl_widget.marker_selected.connect(self.on_marker_selected)
-        layout.addWidget(self.gl_widget)
+        layout.addWidget(self.gl_widget, 1)
         
-        # Scale slider at bottom (initially hidden)
+        # Scale slider bar at bottom of canvas (initially hidden)
         scale_container = QWidget()
+        scale_container.setMaximumHeight(40)
         scale_layout = QHBoxLayout(scale_container)
-        scale_layout.setContentsMargins(5, 5, 5, 5)
+        scale_layout.setContentsMargins(8, 4, 8, 4)
         scale_layout.addWidget(QLabel("Model Size:"))
         
         self.scale_slider = QSlider(Qt.Horizontal)
@@ -83,7 +86,7 @@ class Viewer3D(QWidget):
         scale_container.setStyleSheet("background-color: #F0F0F0;")
         scale_container.setVisible(False)
         self.scale_container = scale_container
-        layout.addWidget(scale_container)
+        layout.addWidget(scale_container, 0)
     
     def show_scale_slider(self):
         self.scale_container.setVisible(True)
@@ -134,6 +137,7 @@ class GL3DCanvas(QOpenGLWidget):
         self.setMouseTracking(True)
         self.last_x = 0
         self.last_y = 0
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     
     def initializeGL(self):
         glClearColor(0.239, 0.239, 0.239, 1.0)
