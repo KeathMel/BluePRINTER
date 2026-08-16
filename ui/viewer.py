@@ -19,7 +19,6 @@ class ViewerWidget(QWidget):
         self.scale_x = 1.0
         self.scale_y = 1.0
         self.pixmap_rect = QRect()
-        self.image_scale = 1.0
         
         self.viewer_label = QLabel()
         self.viewer_label.setAlignment(Qt.AlignCenter)
@@ -28,26 +27,6 @@ class ViewerWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.viewer_label)
-        
-        # Bottom zoom bar
-        zoom_layout = QHBoxLayout()
-        zoom_layout.setContentsMargins(5, 5, 5, 5)
-        zoom_label = QLabel("Image Zoom:")
-        self.zoom_slider = QSlider(Qt.Horizontal)
-        self.zoom_slider.setMinimum(50)
-        self.zoom_slider.setMaximum(200)
-        self.zoom_slider.setValue(100)
-        self.zoom_slider.setTickPosition(QSlider.TicksBelow)
-        self.zoom_slider.setTickInterval(25)
-        self.zoom_slider.setMaximumWidth(200)
-        self.zoom_slider.sliderMoved.connect(self.on_zoom_changed)
-        zoom_percent = QLabel("100%")
-        self.zoom_slider.valueChanged.connect(lambda v: zoom_percent.setText(f"{v}%"))
-        zoom_layout.addWidget(zoom_label)
-        zoom_layout.addWidget(self.zoom_slider)
-        zoom_layout.addWidget(zoom_percent)
-        zoom_layout.addStretch()
-        layout.addLayout(zoom_layout)
         
         self.setStyleSheet("background-color: #F0F0F0;")
         
@@ -75,25 +54,12 @@ class ViewerWidget(QWidget):
             return
         
         self.original_pixmap = pixmap
-        self.zoom_slider.blockSignals(True)
-        self.zoom_slider.setValue(100)
-        self.zoom_slider.blockSignals(False)
-        self.image_scale = 1.0
-        self.update_display_pixmap()
-        self.refresh_display()
-    
-    def update_display_pixmap(self):
-        if not self.original_pixmap:
-            return
-        base_width = 900
-        target_width = int(base_width * self.image_scale)
-        self.display_pixmap = self.original_pixmap.scaledToWidth(target_width, Qt.SmoothTransformation)
+        scaled = pixmap.scaledToWidth(900, Qt.SmoothTransformation)
+        self.display_pixmap = scaled
+        
         self.scale_x = self.original_pixmap.width() / self.display_pixmap.width()
         self.scale_y = self.original_pixmap.height() / self.display_pixmap.height()
-    
-    def on_zoom_changed(self, value):
-        self.image_scale = value / 100.0
-        self.update_display_pixmap()
+        
         self.refresh_display()
     
     def refresh_display(self):

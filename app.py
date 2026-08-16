@@ -102,9 +102,6 @@ class BlueprintApp(QMainWindow):
         
         marker_layout.addWidget(QLabel("Scale:"))
         from PyQt5.QtWidgets import QSlider
-        self.marker_scale_label = QLabel("Scale:")
-        self.marker_scale_label.setVisible(False)
-        marker_layout.addWidget(self.marker_scale_label)
         self.marker_scale = QSlider(Qt.Horizontal)
         self.marker_scale.setMinimum(10)
         self.marker_scale.setMaximum(200)
@@ -112,8 +109,18 @@ class BlueprintApp(QMainWindow):
         self.marker_scale.setTickPosition(QSlider.TicksBelow)
         self.marker_scale.setTickInterval(20)
         self.marker_scale.sliderMoved.connect(self.on_marker_scale_changed)
-        self.marker_scale.setVisible(False)
         marker_layout.addWidget(self.marker_scale)
+        
+        marker_layout.addWidget(QLabel("Model Size (3D only):"))
+        self.model_scale = QSlider(Qt.Horizontal)
+        self.model_scale.setMinimum(50)
+        self.model_scale.setMaximum(200)
+        self.model_scale.setValue(100)
+        self.model_scale.setTickPosition(QSlider.TicksBelow)
+        self.model_scale.setTickInterval(25)
+        self.model_scale.sliderMoved.connect(self.on_model_scale_changed)
+        self.model_scale.setVisible(False)
+        marker_layout.addWidget(self.model_scale)
         
         delete_btn = QPushButton("🗑 DELETE MARKER")
         delete_btn.setStyleSheet("QPushButton { background-color: #E81123; color: white; padding: 8px; }")
@@ -219,7 +226,7 @@ class BlueprintApp(QMainWindow):
         self.viewer.setVisible(False)
         self.viewer3d.setVisible(False)
         self.marker_scale.setVisible(False)
-        self.marker_scale_label.setVisible(False)
+        self.model_scale.setVisible(False)
         try:
             with open(self.current_file, 'r') as f:
                 content = f.read()
@@ -249,16 +256,16 @@ class BlueprintApp(QMainWindow):
         self.viewer3d.setVisible(False)
         self.text_editor.setVisible(False)
         self.marker_scale.setVisible(False)
-        self.marker_scale_label.setVisible(False)
+        self.model_scale.setVisible(False)
         self.viewer.load_file(str(self.current_file), self.current_project)
         self.viewer.setVisible(True)
         self.load_markers()
     
     def load_3d_file(self):
+        self.model_scale.setVisible(True)
         self.viewer.setVisible(False)
         self.text_editor.setVisible(False)
         self.marker_scale.setVisible(True)
-        self.marker_scale_label.setVisible(True)
         self.viewer3d.load_file(str(self.current_file))
         self.viewer3d.setVisible(True)
         self.load_markers()
@@ -460,6 +467,10 @@ class BlueprintApp(QMainWindow):
         # Refresh both displays
         self.viewer3d.update()
         self.viewer.refresh_display()
+    
+    def on_model_scale_changed(self):
+        scale = self.model_scale.value()
+        self.viewer3d.set_model_display_scale(scale)
     
     def delete_selected_marker(self):
         if not self.selected_marker or not self.current_file or not self.current_project:
