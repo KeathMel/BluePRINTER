@@ -121,6 +121,7 @@ class GL3DCanvas(QOpenGLWidget):
         self.dragging = False
         self.model_vertices = None
         self.model_faces = None
+        self.face_shades = None
         self.model_display_scale = 1.0
         self.camera_rot_x = 20
         self.camera_rot_y = 45
@@ -173,38 +174,24 @@ class GL3DCanvas(QOpenGLWidget):
             glPopMatrix()
     
     def draw_model(self):
-        # Solid filled triangles - no wireframe lines
-        glColor3f(0.85, 0.85, 0.85)
+        # Solid filled triangles with precomputed shading
+        if self.model_faces is None or self.face_shades is None:
+            return
         glBegin(GL_TRIANGLES)
-        for face in self.model_faces:
-            try:
-                if len(face) >= 3:
-                    v0 = self.model_vertices[int(face[0])]
-                    v1 = self.model_vertices[int(face[1])]
-                    v2 = self.model_vertices[int(face[2])]
-                    
-                    # Simple flat shading from face normal
-                    edge1 = np.array(v1) - np.array(v0)
-                    edge2 = np.array(v2) - np.array(v0)
-                    normal = np.cross(edge1, edge2)
-                    norm_len = np.linalg.norm(normal)
-                    if norm_len > 0:
-                        normal = normal / norm_len
-                    # Light from top-front
-                    light = np.array([0.3, 0.7, 0.5])
-                    shade = abs(np.dot(normal, light))
-                    shade = 0.35 + 0.65 * shade
-                    glColor3f(shade, shade, shade)
-                    
-                    glVertex3f(float(v0[0]), float(v0[1]), float(v0[2]))
-                    glVertex3f(float(v1[0]), float(v1[1]), float(v1[2]))
-                    glVertex3f(float(v2[0]), float(v2[1]), float(v2[2]))
-            except:
-                pass
+        for i, face in enumerate(self.model_faces):
+            shade = self.face_shades[i]
+            glColor3f(shade, shade, shade)
+            v0 = self.model_vertices[int(face[0])]
+            v1 = self.model_vertices[int(face[1])]
+            v2 = self.model_vertices[int(face[2])]
+            glVertex3f(float(v0[0]), float(v0[1]), float(v0[2]))
+            glVertex3f(float(v1[0]), float(v1[1]), float(v1[2]))
+            glVertex3f(float(v2[0]), float(v2[1]), float(v2[2]))
         glEnd()
     
     def load_file(self, file_path):
         if not HAS_TRIMESH:
+            print("[3D] trimesh not available")
             return
         
         try:
@@ -226,9 +213,28 @@ class GL3DCanvas(QOpenGLWidget):
             self.model_vertices = np.array(mesh.vertices, dtype=np.float32)
             self.model_faces = np.array(mesh.faces, dtype=np.uint32)
             self.model_display_scale = 1.0
+            
+            # Precompute flat shading per face (vectorized)
+            v = self.model_vertices
+            f = self.model_faces
+            v0 = v[f[:, 0]]
+            v1 = v[f[:, 1]]
+            v2 = v[f[:, 2]]
+            normals = np.cross(v1 - v0, v2 - v0)
+            lengths = np.linalg.norm(normals, axis=1, keepdims=True)
+            lengths[lengths == 0] = 1
+            normals = normals / lengths
+            light = np.array([0.3, 0.7, 0.5])
+            light = light / np.linalg.norm(light)
+            shades = np.abs(normals @ light)
+            self.face_shades = (0.35 + 0.65 * shades).astype(np.float32)
+            
+            print(f"[3D] Loaded: {len(self.model_vertices)} verts, {len(self.model_faces)} faces")
             self.update()
-        except:
-            pass
+        except Exception as e:
+            import traceback
+            print(f"[3D] LOAD ERROR: {e}")
+            traceback.print_exc()
     
     def set_model_display_scale(self, scale):
         self.model_display_scale = scale / 100.0
@@ -308,6 +314,7 @@ class GL3DCanvas(QOpenGLWidget):
     def clear(self):
         self.model_vertices = None
         self.model_faces = None
+        self.face_shades = None
         self.markers = []
         self.selected_marker = None
         self.dragging = False
