@@ -1,5 +1,5 @@
 from pathlib import Path
-from PyQt5.QtWidgets import QOpenGLWidget, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider
+from PyQt5.QtWidgets import QOpenGLWidget
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QSurfaceFormat
 from OpenGL.GL import *
@@ -22,12 +22,12 @@ except:
 
 class Viewer3D(QOpenGLWidget):
     marker_selected = pyqtSignal(dict)
-    model_scale_changed = pyqtSignal(float)
     
     def __init__(self):
         super().__init__()
         self.markers = []
-        self.dragging_marker = None
+        self.selected_marker = None
+        self.dragging = False
         self.model_vertices = None
         self.model_faces = None
         self.model_display_scale = 1.0
@@ -68,7 +68,7 @@ class Viewer3D(QOpenGLWidget):
         if self.model_vertices is not None and self.model_faces is not None:
             self.draw_model()
         
-        # Draw markers
+        # Draw markers - NO FRAME LINES, JUST SPHERES
         glColor3f(0.9, 0.07, 0.14)  # Windows red
         for marker in self.markers:
             x = marker.get('position', {}).get('x', 0)
@@ -164,10 +164,11 @@ class Viewer3D(QOpenGLWidget):
             }
             self.markers.append(marker)
             self.marker_selected.emit(marker)
-            self.dragging_marker = marker
+            self.selected_marker = marker
         elif event.button() == Qt.LeftButton:
             for marker in self.markers:
-                self.dragging_marker = marker
+                self.selected_marker = marker
+                self.dragging = True
                 self.marker_selected.emit(marker)
                 break
         
@@ -181,23 +182,18 @@ class Viewer3D(QOpenGLWidget):
         if event.buttons() & Qt.MiddleButton:
             self.camera_rot_y += dx * 0.5
             self.camera_rot_x += dy * 0.5
-        elif event.buttons() & Qt.LeftButton and self.dragging_marker:
-            # Move marker based on camera rotation
-            rad_y = np.radians(self.camera_rot_y)
-            rad_x = np.radians(self.camera_rot_x)
-            
-            # Movement vectors adjusted for view rotation
-            move_x = (dx * np.cos(rad_y) + dy * np.sin(rad_y)) * 0.05
-            move_y = dy * 0.05
-            move_z = (dx * np.sin(rad_y) - dy * np.cos(rad_y)) * 0.05
-            
-            self.dragging_marker['position']['x'] += move_x
-            self.dragging_marker['position']['y'] += move_y
-            self.dragging_marker['position']['z'] += move_z
+        elif event.buttons() & Qt.LeftButton and self.dragging and self.selected_marker:
+            # Simple 3D marker movement - much lower sensitivity
+            self.selected_marker['position']['x'] += dx * 0.01
+            self.selected_marker['position']['y'] -= dy * 0.01
+            self.selected_marker['position']['z'] += dx * 0.005
         
         self.last_x = event.x()
         self.last_y = event.y()
         self.update()
+    
+    def mouseReleaseEvent(self, event):
+        self.dragging = False
     
     def wheelEvent(self, event):
         self.camera_zoom += event.angleDelta().y() / 120
@@ -212,6 +208,7 @@ class Viewer3D(QOpenGLWidget):
         self.model_vertices = None
         self.model_faces = None
         self.markers = []
-        self.dragging_marker = None
+        self.selected_marker = None
+        self.dragging = False
         self.model_display_scale = 1.0
         self.update()

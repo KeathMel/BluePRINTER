@@ -1,5 +1,5 @@
 from pathlib import Path
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt5.QtGui import QPixmap, QColor, QPainter, QBrush, QPen, QFont
 from PyQt5.QtCore import Qt, pyqtSignal, QRect
 import math
@@ -13,7 +13,8 @@ class ViewerWidget(QWidget):
         self.current_project = None
         self.file_type = None
         self.markers = []
-        self.dragging_marker = None
+        self.selected_marker = None
+        self.dragging = False
         self.original_pixmap = None
         self.display_pixmap = None
         self.scale_x = 1.0
@@ -27,7 +28,6 @@ class ViewerWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.viewer_label)
-        
         self.setStyleSheet("background-color: #F0F0F0;")
         
         self.setMouseTracking(True)
@@ -118,19 +118,16 @@ class ViewerWidget(QWidget):
         orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
         
         # Check from newest to oldest marker
-        clicked_marker = None
         for marker in reversed(self.markers):
             mx = marker.get('position', {}).get('x', 0)
             my = marker.get('position', {}).get('y', 0)
             
             dist = math.sqrt((orig_x - mx)**2 + (orig_y - my)**2)
             if dist < 50 * self.scale_x:
-                clicked_marker = marker
-                break
-        
-        if clicked_marker:
-            self.marker_selected.emit(clicked_marker)
-            self.dragging_marker = clicked_marker
+                self.selected_marker = marker
+                self.dragging = True
+                self.marker_selected.emit(marker)
+                return
     
     def on_right_click(self, event):
         if self.file_type != 'image' or not self.display_pixmap:
@@ -141,29 +138,31 @@ class ViewerWidget(QWidget):
         marker = {
             'title': 'Marker',
             'description': '',
-            'position': {'x': orig_x, 'y': orig_y}
+            'position': {'x': orig_x, 'y': orig_y},
+            'scale': 1.0
         }
         self.markers.append(marker)
         self.refresh_display()
         self.marker_selected.emit(marker)
-        self.dragging_marker = marker
     
     def on_mouse_move(self, event):
-        if self.dragging_marker and self.file_type == 'image':
+        if self.dragging and self.selected_marker and self.file_type == 'image':
             orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
             
-            self.dragging_marker['position']['x'] = orig_x
-            self.dragging_marker['position']['y'] = orig_y
+            self.selected_marker['position']['x'] = orig_x
+            self.selected_marker['position']['y'] = orig_y
             self.refresh_display()
-            self.marker_selected.emit(self.dragging_marker)
+            self.marker_selected.emit(self.selected_marker)
     
     def on_mouse_release(self, event):
-        self.dragging_marker = None
+        self.dragging = False
     
     def clear(self):
         self.current_file = None
         self.current_project = None
         self.markers = []
+        self.selected_marker = None
+        self.dragging = False
         self.original_pixmap = None
         self.display_pixmap = None
         self.file_type = None
