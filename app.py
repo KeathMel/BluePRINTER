@@ -112,6 +112,7 @@ class BlueprintApp(QMainWindow):
     
     def on_item_selected(self, item):
         item_type, item_path = item.data(0, Qt.UserRole) or (None, None)
+        print(f"[DEBUG] Selected: {item_type} = {item_path}")
         
         if item_type == 'project':
             self.current_project = self.project_manager.get_project(item_path)
@@ -119,15 +120,20 @@ class BlueprintApp(QMainWindow):
             self.viewer.clear()
             self.viewer3d.clear()
             self.marker_panel.clear()
+            print(f"[DEBUG] Loaded project: {self.current_project}")
         elif item_type == 'file':
             self.current_file = Path(item_path)
+            print(f"[DEBUG] Attempting to load file: {self.current_file}")
             self.load_file_by_type()
+            print(f"[DEBUG] File load complete")
     
     def load_file_by_type(self):
         if not self.current_file or not self.current_project:
+            print("[ERROR] No file or project selected")
             return
         
         ext = self.current_file.suffix.lower()
+        print(f"[DEBUG] File extension: {ext}")
         
         self.viewer.clear()
         self.viewer3d.clear()
@@ -137,18 +143,22 @@ class BlueprintApp(QMainWindow):
         self.marker_manager = MarkerManager(self.current_project, self.current_file)
         
         if ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
+            print("[DEBUG] Loading as IMAGE")
             self.viewer.load_file(str(self.current_file), self.current_project)
             self.viewer.setVisible(True)
             self.viewer3d.setVisible(False)
             self.load_markers()
         elif ext in ['.obj', '.glb', '.gltf']:
+            print("[DEBUG] Loading as 3D")
             self.viewer3d.load_file(str(self.current_file))
             self.viewer3d.setVisible(True)
             self.viewer.setVisible(False)
             self.load_markers()
         elif ext in ['.txt', '.py', '.js', '.md', '.json', '.xml', '.html', '.css']:
+            print("[DEBUG] Loading as TEXT")
             self.load_text_file()
         else:
+            print(f"[WARNING] Unknown file type: {ext}")
             self.viewer.setVisible(False)
             self.viewer3d.setVisible(False)
     
@@ -302,3 +312,12 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# Add at end for debugging
+if __name__ == '__main__':
+    import traceback
+    try:
+        main()
+    except Exception as e:
+        print(f"ERROR: {e}")
+        traceback.print_exc()
