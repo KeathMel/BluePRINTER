@@ -1,44 +1,41 @@
 def apply_iron_man_theme(app):
     """
-    Windows 8.1 Metro (Microsoft Design Language) theme.
+    Windows 8.1 Metro (Microsoft Design Language) theme - hard flat edition.
 
-    Metro principles applied:
-      - Completely FLAT: no gradients, no shadows, no pseudo-3D, ZERO rounded corners
-      - "Content before chrome": minimal borders, lots of whitespace
-      - Segoe UI typography as the primary visual element
-      - Authentic Metro accent palette (Metro Blue #2d89ef)
-      - Sharp geometric rectangular shapes
+    Metro is stark and geometric: NO rounded corners, NO gradients, NO shadows,
+    high contrast, thick square accent borders, flat colored fills, Segoe UI.
+    Pair this with app.setStyle("Fusion") so the native platform style doesn't
+    re-round or smooth the widgets underneath the stylesheet.
     """
-    # Authentic Metro palette
-    METRO_BLUE      = "#2d89ef"   # primary accent
-    METRO_DARK_BLUE = "#2b5797"   # pressed / darker accent
-    METRO_TEAL      = "#00aba9"
+    METRO_BLUE      = "#2d89ef"
+    METRO_DARK_BLUE = "#2b5797"
     METRO_RED       = "#ee1111"
-    BG              = "#ffffff"   # Metro favors white/very light backgrounds
-    PANEL           = "#f2f2f2"   # subtle panel separation
-    TEXT            = "#1d1d1d"   # Metro "darken"
-    SUBTLE_LINE     = "#e6e6e6"   # hairline separators
-    HOVER           = "#e5f1fb"   # light blue hover wash
+    METRO_DARK_RED  = "#b91d47"
+    BG              = "#ffffff"
+    PANEL           = "#ebebeb"
+    TEXT            = "#000000"
+    LINE            = "#000000"   # Metro uses hard, visible edges
+    HOVER           = "#2d89ef"
 
     stylesheet = f"""
     QMainWindow, QWidget {{
         background-color: {BG};
         color: {TEXT};
-        font-family: 'Segoe UI', 'Segoe UI Light', 'Arial', sans-serif;
+        font-family: 'Segoe UI', 'Segoe UI Semilight', 'Arial', sans-serif;
         font-size: 10pt;
     }}
 
-    /* Tree / file list - flat, hairline border */
+    /* Tree / file list - hard 1px black edge, square selection tiles */
     QTreeWidget {{
         background-color: {BG};
-        border: 1px solid {SUBTLE_LINE};
+        border: 1px solid {LINE};
         color: {TEXT};
         font-size: 10pt;
         outline: 0;
-        padding: 2px;
+        padding: 0px;
     }}
     QTreeWidget::item {{
-        padding: 6px 4px;
+        padding: 7px 4px;
         border: none;
     }}
     QTreeWidget::item:selected {{
@@ -47,36 +44,34 @@ def apply_iron_man_theme(app):
     }}
     QTreeWidget::item:hover {{
         background-color: {HOVER};
-        color: {TEXT};
-    }}
-    QTreeWidget::branch {{
-        background: transparent;
+        color: #ffffff;
     }}
 
-    /* Buttons - hard rectangles, no radius, flat fill */
+    /* Buttons - flat square tiles, hard edge, solid color flip on hover */
     QPushButton {{
         background-color: {PANEL};
-        border: 1px solid {SUBTLE_LINE};
+        border: 2px solid {LINE};
         color: {TEXT};
-        padding: 8px 18px;
+        padding: 9px 20px;
         border-radius: 0px;
         font-size: 10pt;
+        font-weight: 600;
     }}
     QPushButton:hover {{
         background-color: {METRO_BLUE};
-        border: 1px solid {METRO_BLUE};
+        border: 2px solid {METRO_BLUE};
         color: #ffffff;
     }}
     QPushButton:pressed {{
         background-color: {METRO_DARK_BLUE};
-        border: 1px solid {METRO_DARK_BLUE};
+        border: 2px solid {METRO_DARK_BLUE};
         color: #ffffff;
     }}
 
-    /* Text inputs - flat, thin border, blue focus */
+    /* Text inputs - square, hard border, THICK blue focus (very Metro) */
     QLineEdit, QTextEdit, QPlainTextEdit {{
         background-color: {BG};
-        border: 1px solid #cccccc;
+        border: 2px solid {LINE};
         color: {TEXT};
         padding: 6px;
         border-radius: 0px;
@@ -94,37 +89,41 @@ def apply_iron_man_theme(app):
         background: transparent;
     }}
 
-    /* Sliders - flat rectangular groove and handle */
+    /* Sliders - flat square groove and blocky square handle */
     QSlider::groove:horizontal {{
         height: 4px;
-        background: #cccccc;
+        background: #bfbfbf;
         border: none;
     }}
     QSlider::sub-page:horizontal {{
         background: {METRO_BLUE};
         border: none;
     }}
+    QSlider::add-page:horizontal {{
+        background: #bfbfbf;
+        border: none;
+    }}
     QSlider::handle:horizontal {{
         background: {METRO_BLUE};
         border: none;
-        width: 12px;
-        height: 20px;
-        margin: -8px 0;
+        width: 10px;
+        height: 22px;
+        margin: -9px 0;
         border-radius: 0px;
     }}
     QSlider::handle:horizontal:hover {{
         background: {METRO_DARK_BLUE};
     }}
 
-    /* Scrollbars - thin, flat, no arrows (Metro style) */
+    /* Scrollbars - thin, flat, square, no arrows */
     QScrollBar:vertical {{
-        background: {BG};
-        width: 12px;
+        background: {PANEL};
+        width: 14px;
         border: none;
         margin: 0px;
     }}
     QScrollBar::handle:vertical {{
-        background: #cdcdcd;
+        background: #999999;
         border-radius: 0px;
         min-height: 30px;
     }}
@@ -132,21 +131,19 @@ def apply_iron_man_theme(app):
         background: {METRO_BLUE};
     }}
     QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {{
-        background: none;
-        height: 0px;
+        background: none; height: 0px;
     }}
     QScrollBar::sub-line:vertical, QScrollBar::add-line:vertical {{
-        background: none;
-        height: 0px;
+        background: none; height: 0px;
     }}
     QScrollBar:horizontal {{
-        background: {BG};
-        height: 12px;
+        background: {PANEL};
+        height: 14px;
         border: none;
         margin: 0px;
     }}
     QScrollBar::handle:horizontal {{
-        background: #cdcdcd;
+        background: #999999;
         border-radius: 0px;
         min-width: 30px;
     }}
@@ -154,23 +151,21 @@ def apply_iron_man_theme(app):
         background: {METRO_BLUE};
     }}
     QScrollBar::left-arrow:horizontal, QScrollBar::right-arrow:horizontal {{
-        background: none;
-        width: 0px;
+        background: none; width: 0px;
     }}
     QScrollBar::sub-line:horizontal, QScrollBar::add-line:horizontal {{
-        background: none;
-        width: 0px;
+        background: none; width: 0px;
     }}
 
-    /* Menus - flat, sharp, blue selection */
+    /* Menus - flat, hard edge, square blue selection */
     QMenu {{
         background-color: {BG};
         color: {TEXT};
-        border: 1px solid #cccccc;
-        padding: 2px;
+        border: 1px solid {LINE};
+        padding: 0px;
     }}
     QMenu::item {{
-        padding: 8px 24px;
+        padding: 9px 26px;
     }}
     QMenu::item:selected {{
         background-color: {METRO_BLUE};
@@ -189,8 +184,8 @@ def apply_iron_man_theme(app):
         background-color: {PANEL};
         color: {TEXT};
         border: none;
-        border-bottom: 1px solid {SUBTLE_LINE};
-        padding: 6px;
+        border-bottom: 2px solid {LINE};
+        padding: 7px;
         font-weight: bold;
     }}
     """

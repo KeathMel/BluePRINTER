@@ -314,18 +314,12 @@ class BlueprintApp(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    # Fusion respects stylesheets literally (native styles round/smooth widgets
+    # regardless of CSS), giving us true flat Metro rectangles.
+    app.setStyle("Fusion")
     window = BlueprintApp()
     window.show()
     sys.exit(app.exec_())
 
 if __name__ == '__main__':
     main()
-
-# Add at end for debugging
-if __name__ == '__main__':
-    import traceback
-    try:
-        main()
-    except Exception as e:
-        print(f"ERROR: {e}")
-        traceback.print_exc()
