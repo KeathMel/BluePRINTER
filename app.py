@@ -196,7 +196,6 @@ class BlueprintApp(QMainWindow):
         markers = self.viewer3d.markers if self.viewer3d.isVisible() else self.viewer.markers
         self.marker_manager.markers = markers
         self.marker_manager.save_markers()
-        print(f"[SAVE] {len(markers)} markers -> {self.marker_manager.current_file.name}")
     
     def on_marker_selected(self, marker):
         self.marker_panel.set_marker(marker)

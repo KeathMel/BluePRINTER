@@ -275,48 +275,64 @@ class GL3DCanvas(QOpenGLWidget):
         self.model_display_scale = scale / 100.0
         self.update()
     
+    def _camera_matrices(self):
+        """Build modelview (M), projection (P), viewport as numpy - matching paintGL."""
+        w = max(1, self.width())
+        h = max(1, self.height())
+
+        # Modelview: translate then rotX then rotY then scale (same order as paintGL)
+        def translate(tx, ty, tz):
+            m = np.eye(4)
+            m[0, 3] = tx; m[1, 3] = ty; m[2, 3] = tz
+            return m
+        def rot_x(a):
+            c, s = np.cos(a), np.sin(a)
+            return np.array([[1,0,0,0],[0,c,-s,0],[0,s,c,0],[0,0,0,1]], dtype=float)
+        def rot_y(a):
+            c, s = np.cos(a), np.sin(a)
+            return np.array([[c,0,s,0],[0,1,0,0],[-s,0,c,0],[0,0,0,1]], dtype=float)
+        def scale(sv):
+            m = np.eye(4)
+            m[0,0] = m[1,1] = m[2,2] = sv
+            return m
+
+        M = translate(0, 0, -self.camera_zoom)
+        M = M @ rot_x(np.radians(self.camera_rot_x))
+        M = M @ rot_y(np.radians(self.camera_rot_y))
+        M = M @ scale(self.model_display_scale)
+
+        # Projection: gluPerspective(45, aspect, 0.1, 1000)
+        fov = np.radians(45.0)
+        aspect = w / h
+        near, far = 0.1, 1000.0
+        f = 1.0 / np.tan(fov / 2.0)
+        P = np.zeros((4, 4))
+        P[0, 0] = f / aspect
+        P[1, 1] = f
+        P[2, 2] = (far + near) / (near - far)
+        P[2, 3] = (2 * far * near) / (near - far)
+        P[3, 2] = -1.0
+
+        return M, P, w, h
+
     def project_to_screen(self, x, y, z):
-        """Project a 3D world point to 2D screen coords using current matrices."""
-        try:
-            modelview = glGetDoublev(GL_MODELVIEW_MATRIX)
-            projection = glGetDoublev(GL_PROJECTION_MATRIX)
-            viewport = glGetIntegerv(GL_VIEWPORT)
-            sx, sy, sz = gluProject(x, y, z, modelview, projection, viewport)
-            # OpenGL y is bottom-up; Qt y is top-down
-            return sx, viewport[3] - sy, sz
-        except Exception:
+        """World point -> (screen_x_topdown, screen_y_topdown, ndc_depth)."""
+        M, P, w, h = self._camera_matrices()
+        clip = P @ M @ np.array([x, y, z, 1.0])
+        if abs(clip[3]) < 1e-9:
             return None
+        ndc = clip[:3] / clip[3]
+        sx = (ndc[0] * 0.5 + 0.5) * w
+        sy = (ndc[1] * 0.5 + 0.5) * h
+        # ndc[1] is bottom-up; convert to Qt top-down
+        return sx, h - sy, ndc[2]
 
     def marker_screen_pos(self, x, y, z):
-        """Return (screen_x, screen_y, depth) for a world point, with the
-        camera transform applied. Depth is the value gluUnProject needs."""
-        self.makeCurrent()
-        glMatrixMode(GL_MODELVIEW)
-        glPushMatrix()
-        glLoadIdentity()
-        glTranslatef(0, 0, -self.camera_zoom)
-        glRotatef(self.camera_rot_x, 1, 0, 0)
-        glRotatef(self.camera_rot_y, 0, 1, 0)
-        glScalef(self.model_display_scale, self.model_display_scale, self.model_display_scale)
-        result = self.project_to_screen(x, y, z)
-        glPopMatrix()
-        return result
+        return self.project_to_screen(x, y, z)
 
     def marker_at_screen(self, click_x, click_y):
-        """Return the marker whose projected screen position is nearest the
-        click within a pixel threshold, or None."""
-        self.makeCurrent()
-        # Re-run the same camera transform used in paintGL so projection matches
-        glMatrixMode(GL_MODELVIEW)
-        glPushMatrix()
-        glLoadIdentity()
-        glTranslatef(0, 0, -self.camera_zoom)
-        glRotatef(self.camera_rot_x, 1, 0, 0)
-        glRotatef(self.camera_rot_y, 0, 1, 0)
-        glScalef(self.model_display_scale, self.model_display_scale, self.model_display_scale)
-
         best = None
-        best_dist = 24.0  # pixel radius for a hit
+        best_dist = 24.0
         for marker in self.markers:
             p = marker.get('position', {})
             screen = self.project_to_screen(p.get('x', 0), p.get('y', 0), p.get('z', 0))
@@ -327,33 +343,23 @@ class GL3DCanvas(QOpenGLWidget):
             if d < best_dist:
                 best_dist = d
                 best = marker
-
-        glPopMatrix()
         return best
 
     def unproject_at_depth(self, screen_x, screen_y, depth):
-        """Convert a 2D screen point + a captured depth into a 3D world point,
-        using the same camera transform as paintGL. Makes markers stick to the cursor."""
-        self.makeCurrent()
-        glMatrixMode(GL_MODELVIEW)
-        glPushMatrix()
-        glLoadIdentity()
-        glTranslatef(0, 0, -self.camera_zoom)
-        glRotatef(self.camera_rot_x, 1, 0, 0)
-        glRotatef(self.camera_rot_y, 0, 1, 0)
-        glScalef(self.model_display_scale, self.model_display_scale, self.model_display_scale)
+        """Screen point + ndc depth -> world point (inverse of project_to_screen)."""
+        M, P, w, h = self._camera_matrices()
+        # Convert Qt top-down screen coords back to NDC
+        ndc_x = (screen_x / w) * 2.0 - 1.0
+        ndc_y = ((h - screen_y) / h) * 2.0 - 1.0
+        ndc = np.array([ndc_x, ndc_y, depth, 1.0])
         try:
-            modelview = glGetDoublev(GL_MODELVIEW_MATRIX)
-            projection = glGetDoublev(GL_PROJECTION_MATRIX)
-            viewport = glGetIntegerv(GL_VIEWPORT)
-            # Qt y is top-down; OpenGL y is bottom-up
-            gl_y = viewport[3] - screen_y
-            world = gluUnProject(screen_x, gl_y, depth, modelview, projection, viewport)
-            glPopMatrix()
-            return world
-        except Exception:
-            glPopMatrix()
+            inv = np.linalg.inv(P @ M)
+        except np.linalg.LinAlgError:
             return None
+        world = inv @ ndc
+        if abs(world[3]) < 1e-9:
+            return None
+        return world[:3] / world[3]
 
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
