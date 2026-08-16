@@ -124,7 +124,7 @@ class GL3DCanvas(QOpenGLWidget):
         self.model_display_scale = 1.0
         self.camera_rot_x = 20
         self.camera_rot_y = 45
-        self.camera_zoom = 60
+        self.camera_zoom = 12
         
         fmt = QSurfaceFormat()
         fmt.setVersion(2, 1)
@@ -143,7 +143,7 @@ class GL3DCanvas(QOpenGLWidget):
         glViewport(0, 0, w, h)
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        gluPerspective(45, w / h if h else 1, 0.1, 500)
+        gluPerspective(45, w / h if h else 1, 0.1, 1000)
         glMatrixMode(GL_MODELVIEW)
     
     def paintGL(self):
@@ -220,7 +220,7 @@ class GL3DCanvas(QOpenGLWidget):
             mesh.apply_translation(-mesh.centroid)
             bounds = mesh.bounds
             if (bounds[1] - bounds[0]).max() > 0:
-                scale = 500.0 / (bounds[1] - bounds[0]).max()
+                scale = 5.0 / (bounds[1] - bounds[0]).max()
                 mesh.apply_scale(scale)
             
             self.model_vertices = np.array(mesh.vertices, dtype=np.float32)
@@ -269,7 +269,7 @@ class GL3DCanvas(QOpenGLWidget):
         elif event.buttons() & Qt.LeftButton and self.dragging and self.selected_marker:
             # Move marker in the camera's screen plane so it follows the cursor
             # regardless of how the camera is rotated.
-            speed = 0.01 * self.camera_zoom / self.model_display_scale
+            speed = 0.005 * self.camera_zoom / self.model_display_scale
             
             rx = np.radians(self.camera_rot_x)
             ry = np.radians(self.camera_rot_y)
@@ -298,7 +298,7 @@ class GL3DCanvas(QOpenGLWidget):
     
     def wheelEvent(self, event):
         self.camera_zoom += event.angleDelta().y() / 120
-        self.camera_zoom = max(1, min(self.camera_zoom, 200))
+        self.camera_zoom = max(2, min(self.camera_zoom, 100))
         self.update()
     
     def set_markers(self, markers):
