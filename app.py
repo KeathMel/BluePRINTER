@@ -473,8 +473,7 @@ class BlueprintApp(QMainWindow):
         self.viewer3d.set_model_display_scale(scale)
     
     def delete_selected_marker(self):
-        if not self.selected_marker or not self.current_file or not self.current_project:
-            print("Cannot delete: missing selection, file, or project")
+        if not self.selected_marker:
             return
         
         reply = QMessageBox.question(self, "Delete Marker", 
@@ -487,19 +486,21 @@ class BlueprintApp(QMainWindow):
             else:
                 markers = self.viewer.markers
             
-            # Remove marker
-            if self.selected_marker in markers:
+            # Remove marker by reference
+            try:
                 markers.remove(self.selected_marker)
-                print(f"Deleted marker. Remaining: {len(markers)}")
+            except ValueError:
+                pass
             
-            # Save and refresh
-            self.save_markers()
+            # Clear selection
             self.selected_marker = None
             self.marker_panel.setVisible(False)
             self.marker_title.setText("")
             self.marker_desc.setText("")
+            self.marker_scale.setValue(100)
             
-            # Refresh display
+            # Save and refresh
+            self.save_markers()
             self.viewer3d.update()
             self.viewer.refresh_display()
     
