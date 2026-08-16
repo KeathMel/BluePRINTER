@@ -250,11 +250,15 @@ class GL3DCanvas(QOpenGLWidget):
             self.selected_marker = marker
             self.marker_selected.emit(marker)
         elif event.button() == Qt.LeftButton:
-            for marker in reversed(self.markers):
-                self.selected_marker = marker
-                self.dragging = True
-                self.marker_selected.emit(marker)
-                break
+            if self.markers:
+                for marker in reversed(self.markers):
+                    self.selected_marker = marker
+                    self.dragging = True
+                    self.marker_selected.emit(marker)
+                    break
+            else:
+                self.selected_marker = None
+                self.dragging = False
         
         self.last_x = event.x()
         self.last_y = event.y()

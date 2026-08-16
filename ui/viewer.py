@@ -63,9 +63,7 @@ class ViewerWidget(QWidget):
         self.refresh_display()
     
     def refresh_display(self):
-        print(f"[DEBUG] refresh_display called, display_pixmap={self.display_pixmap is not None}")
         if not self.display_pixmap:
-            print("[ERROR] No display pixmap!")
             return
         
         pixmap = self.display_pixmap.copy()
@@ -120,6 +118,7 @@ class ViewerWidget(QWidget):
         orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
         
         # Check from newest to oldest marker
+        clicked = False
         for marker in reversed(self.markers):
             mx = marker.get('position', {}).get('x', 0)
             my = marker.get('position', {}).get('y', 0)
@@ -129,7 +128,13 @@ class ViewerWidget(QWidget):
                 self.selected_marker = marker
                 self.dragging = True
                 self.marker_selected.emit(marker)
-                return
+                clicked = True
+                break
+        
+        # If clicked empty space, deselect
+        if not clicked:
+            self.selected_marker = None
+            self.dragging = False
     
     def on_right_click(self, event):
         if self.file_type != 'image' or not self.display_pixmap:
@@ -144,6 +149,7 @@ class ViewerWidget(QWidget):
             'scale': 1.0
         }
         self.markers.append(marker)
+        self.selected_marker = marker
         self.refresh_display()
         self.marker_selected.emit(marker)
     
