@@ -29,9 +29,10 @@ class Viewer3D(QOpenGLWidget):
         self.dragging_marker = None
         self.model_vertices = None
         self.model_faces = None
+        self.drawn_edges = set()
         self.camera_rot_x = 20
         self.camera_rot_y = 45
-        self.camera_zoom = 60  # Much further out
+        self.camera_zoom = 60
         
         fmt = QSurfaceFormat()
         fmt.setVersion(2, 1)
@@ -42,7 +43,7 @@ class Viewer3D(QOpenGLWidget):
         self.last_y = 0
     
     def initializeGL(self):
-        glClearColor(0.039, 0.055, 0.153, 1.0)
+        glClearColor(0.239, 0.239, 0.239, 1.0)
         glEnable(GL_DEPTH_TEST)
         glDisable(GL_LIGHTING)
         glDisable(GL_LIGHT0)
@@ -66,34 +67,42 @@ class Viewer3D(QOpenGLWidget):
             self.draw_model()
         
         # Draw markers
-        glColor3f(0, 0.85, 1)  # Keep markers cyan to distinguish from model
+        glColor3f(0.9, 0.07, 0.14)  # Windows red
         for marker in self.markers:
             x = marker.get('position', {}).get('x', 0)
             y = marker.get('position', {}).get('y', 0)
             z = marker.get('position', {}).get('z', 0)
+            scale = marker.get('scale', 1.0)
             
             glPushMatrix()
             glTranslatef(x, y, z)
             quad = gluNewQuadric()
-            gluSphere(quad, 0.15, 6, 6)
+            gluSphere(quad, 0.15 * scale, 8, 8)
             glPopMatrix()
     
     def draw_model(self):
         if self.model_vertices is None or self.model_faces is None:
             return
         
-        glLineWidth(1.5)
-        glColor3f(1.0, 1.0, 1.0)  # White wireframe
+        glLineWidth(1.2)
+        glColor3f(1.0, 1.0, 1.0)
         glBegin(GL_LINES)
         
+        # Only draw each edge once
+        drawn = set()
         for face in self.model_faces:
             try:
-                # Draw edges of each face
                 for i in range(len(face)):
-                    v1 = self.model_vertices[face[i]]
-                    v2 = self.model_vertices[face[(i+1) % len(face)]]
-                    glVertex3f(float(v1[0]), float(v1[1]), float(v1[2]))
-                    glVertex3f(float(v2[0]), float(v2[1]), float(v2[2]))
+                    v1_idx = face[i]
+                    v2_idx = face[(i+1) % len(face)]
+                    edge = tuple(sorted([v1_idx, v2_idx]))
+                    
+                    if edge not in drawn:
+                        drawn.add(edge)
+                        v1 = self.model_vertices[v1_idx]
+                        v2 = self.model_vertices[v2_idx]
+                        glVertex3f(float(v1[0]), float(v1[1]), float(v1[2]))
+                        glVertex3f(float(v2[0]), float(v2[1]), float(v2[2]))
             except:
                 pass
         
@@ -129,7 +138,7 @@ class Viewer3D(QOpenGLWidget):
             bounds = mesh.bounds
             print(f"[3D] Bounds: {bounds}")
             if (bounds[1] - bounds[0]).max() > 0:
-                scale = 300.0 / (bounds[1] - bounds[0]).max()  # Much bigger
+                scale = 500.0 / (bounds[1] - bounds[0]).max()  # Even bigger
                 mesh.apply_scale(scale)
                 print(f"[3D] Scaled by {scale}")
             
@@ -150,7 +159,8 @@ class Viewer3D(QOpenGLWidget):
             marker = {
                 'title': 'Marker',
                 'description': '',
-                'position': {'x': 0, 'y': 0, 'z': 0}
+                'position': {'x': 0, 'y': 0, 'z': 0},
+                'scale': 1.0
             }
             self.markers.append(marker)
             self.marker_selected.emit(marker)
@@ -172,8 +182,8 @@ class Viewer3D(QOpenGLWidget):
             self.camera_rot_y += dx * 0.5
             self.camera_rot_x += dy * 0.5
         elif event.buttons() & Qt.LeftButton and self.dragging_marker:
-            self.dragging_marker['position']['x'] += dx * 0.1
-            self.dragging_marker['position']['y'] -= dy * 0.1
+            self.dragging_marker['position']['x'] += dx * 0.2
+            self.dragging_marker['position']['y'] -= dy * 0.2
         
         self.last_x = event.x()
         self.last_y = event.y()
@@ -193,4 +203,5 @@ class Viewer3D(QOpenGLWidget):
         self.model_faces = None
         self.markers = []
         self.dragging_marker = None
+        self.drawn_edges = set()
         self.update()

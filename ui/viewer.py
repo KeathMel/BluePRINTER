@@ -1,5 +1,5 @@
 from pathlib import Path
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider
 from PyQt5.QtGui import QPixmap, QColor, QPainter, QBrush, QPen, QFont
 from PyQt5.QtCore import Qt, pyqtSignal, QRect
 import math
@@ -19,15 +19,37 @@ class ViewerWidget(QWidget):
         self.scale_x = 1.0
         self.scale_y = 1.0
         self.pixmap_rect = QRect()
+        self.image_scale = 1.0
         
         self.viewer_label = QLabel()
         self.viewer_label.setAlignment(Qt.AlignCenter)
-        self.viewer_label.setStyleSheet("background-color: #0A0E27;")
+        self.viewer_label.setStyleSheet("background-color: #F0F0F0;")
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.viewer_label)
-        self.setStyleSheet("background-color: #0A0E27;")
+        
+        # Bottom zoom bar
+        zoom_layout = QHBoxLayout()
+        zoom_layout.setContentsMargins(5, 5, 5, 5)
+        zoom_label = QLabel("Image Zoom:")
+        self.zoom_slider = QSlider(Qt.Horizontal)
+        self.zoom_slider.setMinimum(50)
+        self.zoom_slider.setMaximum(200)
+        self.zoom_slider.setValue(100)
+        self.zoom_slider.setTickPosition(QSlider.TicksBelow)
+        self.zoom_slider.setTickInterval(25)
+        self.zoom_slider.setMaximumWidth(200)
+        self.zoom_slider.sliderMoved.connect(self.on_zoom_changed)
+        zoom_percent = QLabel("100%")
+        self.zoom_slider.valueChanged.connect(lambda v: zoom_percent.setText(f"{v}%"))
+        zoom_layout.addWidget(zoom_label)
+        zoom_layout.addWidget(self.zoom_slider)
+        zoom_layout.addWidget(zoom_percent)
+        zoom_layout.addStretch()
+        layout.addLayout(zoom_layout)
+        
+        self.setStyleSheet("background-color: #F0F0F0;")
         
         self.setMouseTracking(True)
         self.viewer_label.mouseMoveEvent = self.on_mouse_move
@@ -53,12 +75,25 @@ class ViewerWidget(QWidget):
             return
         
         self.original_pixmap = pixmap
-        scaled = pixmap.scaledToWidth(900, Qt.SmoothTransformation)
-        self.display_pixmap = scaled
-        
+        self.zoom_slider.blockSignals(True)
+        self.zoom_slider.setValue(100)
+        self.zoom_slider.blockSignals(False)
+        self.image_scale = 1.0
+        self.update_display_pixmap()
+        self.refresh_display()
+    
+    def update_display_pixmap(self):
+        if not self.original_pixmap:
+            return
+        base_width = 900
+        target_width = int(base_width * self.image_scale)
+        self.display_pixmap = self.original_pixmap.scaledToWidth(target_width, Qt.SmoothTransformation)
         self.scale_x = self.original_pixmap.width() / self.display_pixmap.width()
         self.scale_y = self.original_pixmap.height() / self.display_pixmap.height()
-        
+    
+    def on_zoom_changed(self, value):
+        self.image_scale = value / 100.0
+        self.update_display_pixmap()
         self.refresh_display()
     
     def refresh_display(self):
@@ -75,12 +110,12 @@ class ViewerWidget(QWidget):
             x = orig_x / self.scale_x
             y = orig_y / self.scale_y
             
-            painter.setPen(QPen(QColor(0, 217, 255), 2))
-            painter.setBrush(QBrush(QColor(0, 217, 255, 100)))
+            painter.setPen(QPen(QColor(232, 17, 35), 2))
+            painter.setBrush(QBrush(QColor(232, 17, 35, 150)))
             painter.drawEllipse(int(x - 15), int(y - 15), 30, 30)
             
-            painter.setPen(QColor(0, 217, 255))
-            painter.setFont(QFont("Courier", 8))
+            painter.setPen(QColor(232, 17, 35))
+            painter.setFont(QFont("Segoe UI", 8))
             painter.drawText(int(x + 20), int(y), marker.get('title', ''))
         
         painter.end()
@@ -114,12 +149,13 @@ class ViewerWidget(QWidget):
         
         orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
         
-        for marker in self.markers:
+        # Check from newest to oldest marker
+        for marker in reversed(self.markers):
             mx = marker.get('position', {}).get('x', 0)
             my = marker.get('position', {}).get('y', 0)
             
             dist = math.sqrt((orig_x - mx)**2 + (orig_y - my)**2)
-            if dist < 30 * self.scale_x:
+            if dist < 50 * self.scale_x:  # Easier to click
                 self.marker_selected.emit(marker)
                 self.dragging_marker = marker
                 return

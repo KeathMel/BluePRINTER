@@ -96,9 +96,25 @@ class BlueprintApp(QMainWindow):
         marker_layout.addWidget(QLabel("Description:"))
         self.marker_desc = QTextEdit()
         self.marker_desc.setPlaceholderText("Marker description...")
-        self.marker_desc.setMaximumHeight(200)
+        self.marker_desc.setMaximumHeight(150)
         self.marker_desc.textChanged.connect(self.auto_save_marker)
         marker_layout.addWidget(self.marker_desc)
+        
+        marker_layout.addWidget(QLabel("Scale (3D):"))
+        from PyQt5.QtWidgets import QSlider
+        self.marker_scale = QSlider(Qt.Horizontal)
+        self.marker_scale.setMinimum(10)
+        self.marker_scale.setMaximum(200)
+        self.marker_scale.setValue(100)
+        self.marker_scale.setTickPosition(QSlider.TicksBelow)
+        self.marker_scale.setTickInterval(20)
+        self.marker_scale.sliderMoved.connect(self.on_marker_scale_changed)
+        marker_layout.addWidget(self.marker_scale)
+        
+        delete_btn = QPushButton("🗑 DELETE MARKER")
+        delete_btn.setStyleSheet("QPushButton { background-color: #E81123; color: white; }")
+        delete_btn.clicked.connect(self.delete_selected_marker)
+        marker_layout.addWidget(delete_btn)
         
         marker_layout.addStretch()
         self.marker_panel.setLayout(marker_layout)
@@ -418,6 +434,32 @@ class BlueprintApp(QMainWindow):
         self.selected_marker['description'] = self.marker_desc.toPlainText()
         
         self.save_markers()
+    
+    def on_marker_scale_changed(self):
+        if not self.selected_marker:
+            return
+        
+        scale = self.marker_scale.value() / 100.0
+        self.selected_marker['scale'] = scale
+        self.save_markers()
+        self.viewer3d.update()
+    
+    def delete_selected_marker(self):
+        if not self.selected_marker or not self.current_file or not self.current_project:
+            return
+        
+        reply = QMessageBox.question(self, "Delete Marker", 
+                                     "Delete this marker?",
+                                     QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            markers = self.viewer3d.markers if self.viewer3d.isVisible() else self.viewer.markers
+            if self.selected_marker in markers:
+                markers.remove(self.selected_marker)
+            self.save_markers()
+            self.selected_marker = None
+            self.marker_panel.setVisible(False)
+            self.viewer3d.update()
+            self.viewer.refresh_display()
     
     def load_markers(self):
         if not self.current_file or not self.current_project:
