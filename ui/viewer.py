@@ -6,7 +6,7 @@ import math
 
 class ViewerWidget(QWidget):
     marker_selected = pyqtSignal(dict)
-    
+
     def __init__(self):
         super().__init__()
         self.current_file = None
@@ -20,158 +20,134 @@ class ViewerWidget(QWidget):
         self.scale_x = 1.0
         self.scale_y = 1.0
         self.pixmap_rect = QRect()
-        
+
         self.viewer_label = QLabel()
         self.viewer_label.setAlignment(Qt.AlignCenter)
         self.viewer_label.setStyleSheet("background-color: #F0F0F0;")
-        
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.viewer_label)
         self.setStyleSheet("background-color: #F0F0F0;")
-        
-        self.setMouseTracking(True)
-        self.viewer_label.mouseMoveEvent = self.on_mouse_move
+
+        # All mouse handling goes through the label
+        self.viewer_label.setMouseTracking(True)
         self.viewer_label.mousePressEvent = self.on_mouse_press
+        self.viewer_label.mouseMoveEvent = self.on_mouse_move
         self.viewer_label.mouseReleaseEvent = self.on_mouse_release
-        self.viewer_label.contextMenuEvent = self.on_right_click
-    
+
     def load_file(self, file_path, project=None):
         self.current_file = Path(file_path)
         self.current_project = project
         ext = self.current_file.suffix.lower()
-        
         if ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
             self.load_image(file_path)
             self.file_type = 'image'
         else:
             self.viewer_label.setText(f"Unsupported: {ext}")
-    
+
     def load_image(self, file_path):
         pixmap = QPixmap(str(file_path))
         if pixmap.isNull():
             self.viewer_label.setText("Failed to load image")
             return
-        
         self.original_pixmap = pixmap
-        scaled = pixmap.scaledToWidth(900, Qt.SmoothTransformation)
-        self.display_pixmap = scaled
-        
+        self.display_pixmap = pixmap.scaledToWidth(900, Qt.SmoothTransformation)
         self.scale_x = self.original_pixmap.width() / self.display_pixmap.width()
         self.scale_y = self.original_pixmap.height() / self.display_pixmap.height()
-        
         self.refresh_display()
-    
+
     def refresh_display(self):
         if not self.display_pixmap:
             return
-        
         pixmap = self.display_pixmap.copy()
         painter = QPainter(pixmap)
-        
         for marker in self.markers:
-            orig_x = marker.get('position', {}).get('x', 0)
-            orig_y = marker.get('position', {}).get('y', 0)
+            ox = marker['position']['x']
+            oy = marker['position']['y']
             scale = marker.get('scale', 1.0)
-            
-            x = orig_x / self.scale_x
-            y = orig_y / self.scale_y
-            marker_size = int(15 * scale)
-            
+            x = ox / self.scale_x
+            y = oy / self.scale_y
+            r = int(15 * scale)
             painter.setPen(QPen(QColor(232, 17, 35), 2))
             painter.setBrush(QBrush(QColor(232, 17, 35, 150)))
-            painter.drawEllipse(int(x - marker_size), int(y - marker_size), marker_size * 2, marker_size * 2)
-            
+            painter.drawEllipse(int(x - r), int(y - r), r * 2, r * 2)
             painter.setPen(QColor(232, 17, 35))
             painter.setFont(QFont("Segoe UI", 8))
-            painter.drawText(int(x + marker_size + 5), int(y), marker.get('title', ''))
-        
+            painter.drawText(int(x + r + 5), int(y), marker.get('title', ''))
         painter.end()
         self.viewer_label.setPixmap(pixmap)
-        
+
         pm = self.viewer_label.pixmap()
         if pm:
-            label_rect = self.viewer_label.rect()
-            pm_width = pm.width()
-            pm_height = pm.height()
-            x_offset = (label_rect.width() - pm_width) / 2
-            y_offset = (label_rect.height() - pm_height) / 2
-            self.pixmap_rect = QRect(int(x_offset), int(y_offset), pm_width, pm_height)
-    
-    def screen_to_image_coords(self, screen_x, screen_y):
-        pm_x = screen_x - self.pixmap_rect.x()
-        pm_y = screen_y - self.pixmap_rect.y()
-        
-        orig_x = pm_x * self.scale_x
-        orig_y = pm_y * self.scale_y
-        
-        return orig_x, orig_y
-    
+            lr = self.viewer_label.rect()
+            xo = (lr.width() - pm.width()) / 2
+            yo = (lr.height() - pm.height()) / 2
+            self.pixmap_rect = QRect(int(xo), int(yo), pm.width(), pm.height())
+
+    def screen_to_image_coords(self, sx, sy):
+        px = sx - self.pixmap_rect.x()
+        py = sy - self.pixmap_rect.y()
+        return px * self.scale_x, py * self.scale_y
+
+    def find_marker_at(self, ox, oy):
+        # Return the topmost marker within its own visual radius, else None
+        for marker in reversed(self.markers):
+            mx = marker['position']['x']
+            my = marker['position']['y']
+            r = 15 * marker.get('scale', 1.0) * self.scale_x + 10 * self.scale_x
+            if math.sqrt((ox - mx) ** 2 + (oy - my) ** 2) <= r:
+                return marker
+        return None
+
     def set_markers(self, markers):
         self.markers = markers
+        self.selected_marker = None
+        self.dragging = False
         self.refresh_display()
-    
+
     def on_mouse_press(self, event):
         if self.file_type != 'image' or not self.display_pixmap:
             return
-        
-        # ONLY handle left-click here. Right-click is handled by contextMenuEvent.
-        if event.button() != Qt.LeftButton:
-            return
-        
-        orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
-        
-        # Hit radius in original image coords - generous for easy clicking
-        hit_radius = 30 * self.scale_x
-        
-        # Check from newest to oldest marker
-        clicked = False
-        for marker in reversed(self.markers):
-            mx = marker.get('position', {}).get('x', 0)
-            my = marker.get('position', {}).get('y', 0)
-            
-            dist = math.sqrt((orig_x - mx)**2 + (orig_y - my)**2)
-            if dist < hit_radius:
-                self.selected_marker = marker
-                self.dragging = True
-                self.marker_selected.emit(marker)
-                clicked = True
-                break
-        
-        # If clicked empty space, deselect
-        if not clicked:
-            self.selected_marker = None
+
+        ox, oy = self.screen_to_image_coords(event.pos().x(), event.pos().y())
+
+        if event.button() == Qt.RightButton:
+            # Create a new marker and select it
+            marker = {
+                'title': 'Marker',
+                'description': '',
+                'position': {'x': ox, 'y': oy},
+                'scale': 1.0,
+            }
+            self.markers.append(marker)
+            self.selected_marker = marker
             self.dragging = False
-    
-    def on_right_click(self, event):
-        if self.file_type != 'image' or not self.display_pixmap:
+            self.refresh_display()
+            self.marker_selected.emit(marker)
             return
-        
-        orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
-        
-        marker = {
-            'title': 'Marker',
-            'description': '',
-            'position': {'x': orig_x, 'y': orig_y},
-            'scale': 1.0
-        }
-        self.markers.append(marker)
-        self.selected_marker = marker
-        self.refresh_display()
-        self.marker_selected.emit(marker)
-    
+
+        if event.button() == Qt.LeftButton:
+            hit = self.find_marker_at(ox, oy)
+            if hit is not None:
+                self.selected_marker = hit
+                self.dragging = True
+                self.marker_selected.emit(hit)
+            else:
+                self.selected_marker = None
+                self.dragging = False
+
     def on_mouse_move(self, event):
         if self.dragging and self.selected_marker and self.file_type == 'image':
-            orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
-            
-            self.selected_marker['position']['x'] = orig_x
-            self.selected_marker['position']['y'] = orig_y
+            ox, oy = self.screen_to_image_coords(event.pos().x(), event.pos().y())
+            self.selected_marker['position']['x'] = ox
+            self.selected_marker['position']['y'] = oy
             self.refresh_display()
             self.marker_selected.emit(self.selected_marker)
-    
+
     def on_mouse_release(self, event):
         self.dragging = False
-    
+
     def clear(self):
         self.current_file = None
         self.current_project = None
