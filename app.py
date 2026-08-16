@@ -67,6 +67,11 @@ class BlueprintApp(QMainWindow):
         self.viewer3d.setVisible(False)
         center_layout.addWidget(self.viewer3d)
         
+        from PyQt5.QtWidgets import QTextEdit
+        self.text_editor = QTextEdit()
+        self.text_editor.setVisible(False)
+        center_layout.addWidget(self.text_editor)
+        
         # RIGHT - Marker Panel
         self.marker_panel = MarkerPanel()
         self.marker_panel.marker_changed.connect(self.save_markers)
@@ -127,28 +132,39 @@ class BlueprintApp(QMainWindow):
         self.viewer.clear()
         self.viewer3d.clear()
         self.marker_panel.clear()
+        self.text_editor.setVisible(False)
         
         self.marker_manager = MarkerManager(self.current_project, self.current_file)
         
         if ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
             self.viewer.load_file(str(self.current_file), self.current_project)
-            self.viewer3d.setVisible(False)
             self.viewer.setVisible(True)
+            self.viewer3d.setVisible(False)
             self.load_markers()
         elif ext in ['.obj', '.glb', '.gltf']:
             self.viewer3d.load_file(str(self.current_file))
-            self.viewer.setVisible(False)
             self.viewer3d.setVisible(True)
+            self.viewer.setVisible(False)
             self.load_markers()
         elif ext in ['.txt', '.py', '.js', '.md', '.json', '.xml', '.html', '.css']:
             self.load_text_file()
+        else:
+            self.viewer.setVisible(False)
+            self.viewer3d.setVisible(False)
     
     def load_text_file(self):
+        self.viewer.setVisible(False)
+        self.viewer3d.setVisible(False)
+        self.marker_panel.clear()
+        
         try:
             with open(self.current_file, 'r') as f:
                 content = f.read()
+            self.text_editor.setPlainText(content)
         except:
-            content = "Error reading file"
+            self.text_editor.setPlainText("Error reading file")
+        
+        self.text_editor.setVisible(True)
     
     def load_markers(self):
         if not self.marker_manager:
