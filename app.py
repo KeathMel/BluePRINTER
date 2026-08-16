@@ -68,8 +68,24 @@ class BlueprintApp(QMainWindow):
         center_layout.addWidget(self.viewer3d)
         
         from PyQt5.QtWidgets import QTextEdit
+        from PyQt5.QtGui import QFont as _QFont
         self.text_editor = QTextEdit()
         self.text_editor.setVisible(False)
+        editor_font = _QFont("Consolas", 11)
+        editor_font.setStyleHint(_QFont.Monospace)
+        self.text_editor.setFont(editor_font)
+        self.text_editor.setStyleSheet(
+            "QTextEdit {"
+            " background-color: #ffffff;"
+            " color: #1d1d1d;"
+            " border: 2px solid #000000;"
+            " border-radius: 0px;"
+            " padding: 16px;"
+            " selection-background-color: #2d89ef;"
+            " selection-color: #ffffff;"
+            "}"
+        )
+        self.text_editor.setLineWrapMode(QTextEdit.WidgetWidth)
         center_layout.addWidget(self.text_editor)
         
         # RIGHT - Marker Panel
@@ -146,19 +162,16 @@ class BlueprintApp(QMainWindow):
         self.marker_manager = MarkerManager(self.current_project, self.current_file)
         
         if ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
-            print("[DEBUG] Loading as IMAGE")
             self.viewer.load_file(str(self.current_file), self.current_project)
             self.viewer.setVisible(True)
             self.viewer3d.setVisible(False)
             self.load_markers()
         elif ext in ['.obj', '.glb', '.gltf']:
-            print("[DEBUG] Loading as 3D")
             self.viewer3d.load_file(str(self.current_file))
             self.viewer3d.setVisible(True)
             self.viewer.setVisible(False)
             self.load_markers()
         elif ext in ['.txt', '.py', '.js', '.md', '.json', '.xml', '.html', '.css']:
-            print("[DEBUG] Loading as TEXT")
             self.load_text_file()
         else:
             self.viewer.setVisible(False)
@@ -176,6 +189,7 @@ class BlueprintApp(QMainWindow):
         except:
             self.text_editor.setPlainText("Error reading file")
         
+        self.text_editor.document().setDocumentMargin(8)
         self.text_editor.setVisible(True)
     
     def load_markers(self):
