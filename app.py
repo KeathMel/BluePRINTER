@@ -120,12 +120,20 @@ class BlueprintApp(QMainWindow):
             self.viewer3d.clear()
             self.marker_panel.clear()
         elif item_type == 'file':
+            # Walk up the tree to find the parent project
+            parent = item.parent()
+            while parent is not None:
+                p_type, p_path = parent.data(0, Qt.UserRole) or (None, None)
+                if p_type == 'project':
+                    self.current_project = self.project_manager.get_project(p_path)
+                    break
+                parent = parent.parent()
+            
             self.current_file = Path(item_path)
             self.load_file_by_type()
     
     def load_file_by_type(self):
         if not self.current_file or not self.current_project:
-            print("[ERROR] No file or project selected")
             return
         
         ext = self.current_file.suffix.lower()
