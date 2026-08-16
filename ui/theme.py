@@ -1,79 +1,111 @@
 def apply_iron_man_theme(app):
     stylesheet = """
     QMainWindow, QWidget {
-        background-color: #0A0E27;
-        color: #E8E8E8;
-    }
-    
-    QListWidget {
-        background-color: rgba(26, 31, 58, 0.6);
-        border: 1px solid rgba(0, 217, 255, 0.2);
-        border-radius: 6px;
-        color: #E8E8E8;
-    }
-    
-    QListWidget::item:selected {
-        background-color: rgba(0, 217, 255, 0.3);
-        border-left: 3px solid #00D9FF;
+        background-color: #F0F0F0;
+        color: #333333;
     }
     
     QTreeWidget {
-        background-color: rgba(26, 31, 58, 0.6);
-        border: 1px solid rgba(0, 217, 255, 0.2);
-        border-radius: 6px;
-        color: #E8E8E8;
+        background-color: #FFFFFF;
+        border: 1px solid #CCCCCC;
+        color: #333333;
+        font-family: 'Segoe UI', 'Arial', sans-serif;
+        font-size: 10pt;
     }
     
     QTreeWidget::item:selected {
-        background-color: rgba(0, 217, 255, 0.3);
+        background-color: #0078D4;
+        color: #FFFFFF;
+    }
+    
+    QTreeWidget::item:hover {
+        background-color: #E8E8E8;
     }
     
     QPushButton {
-        background-color: rgba(0, 217, 255, 0.1);
-        border: 1px solid rgba(0, 217, 255, 0.4);
-        color: #00D9FF;
-        padding: 8px 16px;
-        border-radius: 4px;
-        font-family: 'Courier New', monospace;
-        font-weight: bold;
+        background-color: #E1E1E1;
+        border: 1px solid #CCCCCC;
+        color: #333333;
+        padding: 6px 16px;
+        border-radius: 2px;
+        font-family: 'Segoe UI', 'Arial', sans-serif;
+        font-size: 10pt;
     }
     
     QPushButton:hover {
-        background-color: rgba(0, 217, 255, 0.2);
+        background-color: #D0D0D0;
+        border: 1px solid #999999;
+    }
+    
+    QPushButton:pressed {
+        background-color: #0078D4;
+        color: #FFFFFF;
+        border: 1px solid #0078D4;
     }
     
     QLineEdit, QTextEdit {
-        background-color: rgba(0, 217, 255, 0.05);
-        border: 1px solid rgba(0, 217, 255, 0.3);
-        color: #E8E8E8;
-        padding: 6px;
-        border-radius: 4px;
-        font-family: 'Courier New', monospace;
+        background-color: #FFFFFF;
+        border: 1px solid #CCCCCC;
+        color: #333333;
+        padding: 4px;
+        font-family: 'Segoe UI', 'Arial', sans-serif;
+        font-size: 10pt;
     }
     
     QLineEdit:focus, QTextEdit:focus {
-        border: 1px solid #00D9FF;
-        background-color: rgba(0, 217, 255, 0.1);
+        border: 1px solid #0078D4;
+        background-color: #FFFFFF;
     }
     
     QLabel {
-        color: #E8E8E8;
-        font-family: 'Courier New', monospace;
+        color: #333333;
+        font-family: 'Segoe UI', 'Arial', sans-serif;
+        font-size: 10pt;
     }
     
     QScrollBar:vertical {
-        background: rgba(0, 217, 255, 0.05);
-        width: 8px;
-        border-radius: 4px;
+        background: #F0F0F0;
+        width: 12px;
+        border: none;
     }
     
     QScrollBar::handle:vertical {
-        background: rgba(0, 217, 255, 0.3);
-        border-radius: 4px;
+        background: #CCCCCC;
+        border-radius: 0px;
+        min-height: 20px;
     }
     
     QScrollBar::handle:vertical:hover {
-        background: rgba(0, 217, 255, 0.5);
+        background: #999999;
+    }
+    
+    QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
+        background: none;
+    }
+    
+    QScrollBar::sub-line:vertical, QScrollBar::add-line:vertical {
+        background: none;
+    }
+    
+    QMenu {
+        background-color: #FFFFFF;
+        color: #333333;
+        border: 1px solid #CCCCCC;
+        font-family: 'Segoe UI', 'Arial', sans-serif;
+    }
+    
+    QMenu::item:selected {
+        background-color: #0078D4;
+        color: #FFFFFF;
+    }
+    
+    QDialog {
+        background-color: #F0F0F0;
+        color: #333333;
+    }
+    
+    QMessageBox {
+        background-color: #F0F0F0;
     }
     """
     app.setStyleSheet(stylesheet)
