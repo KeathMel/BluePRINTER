@@ -68,10 +68,10 @@ class ViewerWidget(QWidget):
             x = ox / self.scale_x
             y = oy / self.scale_y
             r = int(15 * scale)
-            painter.setPen(QPen(QColor(232, 17, 35), 2))
-            painter.setBrush(QBrush(QColor(232, 17, 35, 150)))
+            painter.setPen(QPen(QColor(238, 17, 17), 2))
+            painter.setBrush(QBrush(QColor(238, 17, 17, 150)))
             painter.drawEllipse(int(x - r), int(y - r), r * 2, r * 2)
-            painter.setPen(QColor(232, 17, 35))
+            painter.setPen(QColor(238, 17, 17))
             painter.setFont(QFont("Segoe UI", 8))
             painter.drawText(int(x + r + 5), int(y), marker.get('title', ''))
         painter.end()

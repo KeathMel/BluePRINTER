@@ -15,7 +15,7 @@ class MarkerPanel(QWidget):
         layout = QVBoxLayout(self)
         
         title_label = QLabel("MARKER")
-        title_label.setStyleSheet("color: #0078D4; font-weight: bold;")
+        title_label.setStyleSheet("color: #2d89ef; font-weight: bold; font-size: 14pt;")
         layout.addWidget(title_label)
         
         layout.addWidget(QLabel("Title:"))
@@ -40,7 +40,7 @@ class MarkerPanel(QWidget):
         layout.addWidget(self.scale_slider)
         
         delete_btn = QPushButton("🗑 DELETE MARKER")
-        delete_btn.setStyleSheet("QPushButton { background-color: #E81123; color: white; padding: 8px; }")
+        delete_btn.setStyleSheet("QPushButton { background-color: #ee1111; color: white; padding: 8px; border: none; border-radius: 0px; } QPushButton:hover { background-color: #b91d47; }")
         delete_btn.clicked.connect(self._on_delete)
         layout.addWidget(delete_btn)
         

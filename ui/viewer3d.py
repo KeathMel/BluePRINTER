@@ -166,7 +166,7 @@ class GL3DCanvas(QOpenGLWidget):
         # Draw markers ALWAYS ON TOP - disable depth test so they're never
         # hidden inside the model, and make them big enough to see.
         glDisable(GL_DEPTH_TEST)
-        glColor3f(0.9, 0.07, 0.14)
+        glColor3f(0.933, 0.067, 0.067)  # Metro red #ee1111
         for marker in self.markers:
             x = marker.get('position', {}).get('x', 0)
             y = marker.get('position', {}).get('y', 0)
