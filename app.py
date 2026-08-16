@@ -100,8 +100,11 @@ class BlueprintApp(QMainWindow):
         self.marker_desc.textChanged.connect(self.auto_save_marker)
         marker_layout.addWidget(self.marker_desc)
         
-        marker_layout.addWidget(QLabel("Scale (3D):"))
+        marker_layout.addWidget(QLabel("Scale:"))
         from PyQt5.QtWidgets import QSlider
+        self.marker_scale_label = QLabel("Scale:")
+        self.marker_scale_label.setVisible(False)
+        marker_layout.addWidget(self.marker_scale_label)
         self.marker_scale = QSlider(Qt.Horizontal)
         self.marker_scale.setMinimum(10)
         self.marker_scale.setMaximum(200)
@@ -109,10 +112,11 @@ class BlueprintApp(QMainWindow):
         self.marker_scale.setTickPosition(QSlider.TicksBelow)
         self.marker_scale.setTickInterval(20)
         self.marker_scale.sliderMoved.connect(self.on_marker_scale_changed)
+        self.marker_scale.setVisible(False)
         marker_layout.addWidget(self.marker_scale)
         
         delete_btn = QPushButton("🗑 DELETE MARKER")
-        delete_btn.setStyleSheet("QPushButton { background-color: #E81123; color: white; }")
+        delete_btn.setStyleSheet("QPushButton { background-color: #E81123; color: white; padding: 8px; }")
         delete_btn.clicked.connect(self.delete_selected_marker)
         marker_layout.addWidget(delete_btn)
         
@@ -214,6 +218,8 @@ class BlueprintApp(QMainWindow):
     def load_text_file(self):
         self.viewer.setVisible(False)
         self.viewer3d.setVisible(False)
+        self.marker_scale.setVisible(False)
+        self.marker_scale_label.setVisible(False)
         try:
             with open(self.current_file, 'r') as f:
                 content = f.read()
@@ -242,6 +248,8 @@ class BlueprintApp(QMainWindow):
     def load_image_file(self):
         self.viewer3d.setVisible(False)
         self.text_editor.setVisible(False)
+        self.marker_scale.setVisible(False)
+        self.marker_scale_label.setVisible(False)
         self.viewer.load_file(str(self.current_file), self.current_project)
         self.viewer.setVisible(True)
         self.load_markers()
@@ -249,6 +257,8 @@ class BlueprintApp(QMainWindow):
     def load_3d_file(self):
         self.viewer.setVisible(False)
         self.text_editor.setVisible(False)
+        self.marker_scale.setVisible(True)
+        self.marker_scale_label.setVisible(True)
         self.viewer3d.load_file(str(self.current_file))
         self.viewer3d.setVisible(True)
         self.load_markers()
@@ -416,12 +426,16 @@ class BlueprintApp(QMainWindow):
         self.selected_marker = marker_data
         self.marker_title.blockSignals(True)
         self.marker_desc.blockSignals(True)
+        self.marker_scale.blockSignals(True)
         
         self.marker_title.setText(marker_data.get('title', ''))
         self.marker_desc.setPlainText(marker_data.get('description', ''))
+        scale_value = int(marker_data.get('scale', 1.0) * 100)
+        self.marker_scale.setValue(scale_value)
         
         self.marker_title.blockSignals(False)
         self.marker_desc.blockSignals(False)
+        self.marker_scale.blockSignals(False)
         
         self.marker_panel.setVisible(True)
         self.save_markers()
@@ -442,22 +456,39 @@ class BlueprintApp(QMainWindow):
         scale = self.marker_scale.value() / 100.0
         self.selected_marker['scale'] = scale
         self.save_markers()
+        
+        # Refresh both displays
         self.viewer3d.update()
+        self.viewer.refresh_display()
     
     def delete_selected_marker(self):
         if not self.selected_marker or not self.current_file or not self.current_project:
+            print("Cannot delete: missing selection, file, or project")
             return
         
         reply = QMessageBox.question(self, "Delete Marker", 
                                      "Delete this marker?",
                                      QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.Yes:
-            markers = self.viewer3d.markers if self.viewer3d.isVisible() else self.viewer.markers
+            # Get correct markers list
+            if self.viewer3d.isVisible():
+                markers = self.viewer3d.markers
+            else:
+                markers = self.viewer.markers
+            
+            # Remove marker
             if self.selected_marker in markers:
                 markers.remove(self.selected_marker)
+                print(f"Deleted marker. Remaining: {len(markers)}")
+            
+            # Save and refresh
             self.save_markers()
             self.selected_marker = None
             self.marker_panel.setVisible(False)
+            self.marker_title.setText("")
+            self.marker_desc.setText("")
+            
+            # Refresh display
             self.viewer3d.update()
             self.viewer.refresh_display()
     

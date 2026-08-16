@@ -29,7 +29,6 @@ class Viewer3D(QOpenGLWidget):
         self.dragging_marker = None
         self.model_vertices = None
         self.model_faces = None
-        self.drawn_edges = set()
         self.camera_rot_x = 20
         self.camera_rot_y = 45
         self.camera_zoom = 60
@@ -86,19 +85,20 @@ class Viewer3D(QOpenGLWidget):
         
         glLineWidth(1.2)
         glColor3f(1.0, 1.0, 1.0)
-        glBegin(GL_LINES)
         
-        # Only draw each edge once
-        drawn = set()
+        # Draw only triangle edges once
+        glBegin(GL_LINES)
+        drawn_edges = set()
+        
         for face in self.model_faces:
             try:
                 for i in range(len(face)):
-                    v1_idx = face[i]
-                    v2_idx = face[(i+1) % len(face)]
+                    v1_idx = int(face[i])
+                    v2_idx = int(face[(i+1) % len(face)])
                     edge = tuple(sorted([v1_idx, v2_idx]))
                     
-                    if edge not in drawn:
-                        drawn.add(edge)
+                    if edge not in drawn_edges:
+                        drawn_edges.add(edge)
                         v1 = self.model_vertices[v1_idx]
                         v2 = self.model_vertices[v2_idx]
                         glVertex3f(float(v1[0]), float(v1[1]), float(v1[2]))
@@ -111,24 +111,19 @@ class Viewer3D(QOpenGLWidget):
     
     def load_file(self, file_path):
         print(f"[3D] Loading: {file_path}")
-        print(f"[3D] Trimesh available: {HAS_TRIMESH}")
         
         if not HAS_TRIMESH:
             print("[3D] Trimesh not available")
             return
         
         try:
-            print(f"[3D] Opening file...")
             mesh = trimesh.load(str(file_path))
-            print(f"[3D] Loaded, type: {type(mesh)}")
             
             if isinstance(mesh, trimesh.Scene):
-                print("[3D] Is Scene, extracting meshes")
                 meshes = list(mesh.geometry.values())
                 if meshes:
                     mesh = trimesh.util.concatenate(meshes)
             elif isinstance(mesh, list):
-                print("[3D] Is list, concatenating")
                 mesh = trimesh.util.concatenate(mesh)
             
             print(f"[3D] Vertices: {len(mesh.vertices)}, Faces: {len(mesh.faces)}")
@@ -136,21 +131,18 @@ class Viewer3D(QOpenGLWidget):
             # Center and scale
             mesh.apply_translation(-mesh.centroid)
             bounds = mesh.bounds
-            print(f"[3D] Bounds: {bounds}")
             if (bounds[1] - bounds[0]).max() > 0:
-                scale = 500.0 / (bounds[1] - bounds[0]).max()  # Even bigger
+                scale = 500.0 / (bounds[1] - bounds[0]).max()
                 mesh.apply_scale(scale)
                 print(f"[3D] Scaled by {scale}")
             
             self.model_vertices = np.array(mesh.vertices, dtype=np.float32)
             self.model_faces = np.array(mesh.faces, dtype=np.uint32)
             
-            print(f"[3D] SUCCESS - Model ready to render")
+            print(f"[3D] SUCCESS - Model ready")
             self.update()
         except Exception as e:
             print(f"[3D] ERROR: {e}")
-            import traceback
-            traceback.print_exc()
             self.model_vertices = None
             self.model_faces = None
     
@@ -182,8 +174,9 @@ class Viewer3D(QOpenGLWidget):
             self.camera_rot_y += dx * 0.5
             self.camera_rot_x += dy * 0.5
         elif event.buttons() & Qt.LeftButton and self.dragging_marker:
-            self.dragging_marker['position']['x'] += dx * 0.2
-            self.dragging_marker['position']['y'] -= dy * 0.2
+            # Slower, easier movement
+            self.dragging_marker['position']['x'] += dx * 0.05
+            self.dragging_marker['position']['y'] -= dy * 0.05
         
         self.last_x = event.x()
         self.last_y = event.y()
@@ -203,5 +196,4 @@ class Viewer3D(QOpenGLWidget):
         self.model_faces = None
         self.markers = []
         self.dragging_marker = None
-        self.drawn_edges = set()
         self.update()

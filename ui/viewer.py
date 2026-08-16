@@ -106,17 +106,19 @@ class ViewerWidget(QWidget):
         for marker in self.markers:
             orig_x = marker.get('position', {}).get('x', 0)
             orig_y = marker.get('position', {}).get('y', 0)
+            scale = marker.get('scale', 1.0)
             
             x = orig_x / self.scale_x
             y = orig_y / self.scale_y
+            marker_size = int(15 * scale)
             
             painter.setPen(QPen(QColor(232, 17, 35), 2))
             painter.setBrush(QBrush(QColor(232, 17, 35, 150)))
-            painter.drawEllipse(int(x - 15), int(y - 15), 30, 30)
+            painter.drawEllipse(int(x - marker_size), int(y - marker_size), marker_size * 2, marker_size * 2)
             
             painter.setPen(QColor(232, 17, 35))
             painter.setFont(QFont("Segoe UI", 8))
-            painter.drawText(int(x + 20), int(y), marker.get('title', ''))
+            painter.drawText(int(x + marker_size + 5), int(y), marker.get('title', ''))
         
         painter.end()
         self.viewer_label.setPixmap(pixmap)
@@ -150,15 +152,19 @@ class ViewerWidget(QWidget):
         orig_x, orig_y = self.screen_to_image_coords(event.pos().x(), event.pos().y())
         
         # Check from newest to oldest marker
+        clicked_marker = None
         for marker in reversed(self.markers):
             mx = marker.get('position', {}).get('x', 0)
             my = marker.get('position', {}).get('y', 0)
             
             dist = math.sqrt((orig_x - mx)**2 + (orig_y - my)**2)
-            if dist < 50 * self.scale_x:  # Easier to click
-                self.marker_selected.emit(marker)
-                self.dragging_marker = marker
-                return
+            if dist < 50 * self.scale_x:
+                clicked_marker = marker
+                break
+        
+        if clicked_marker:
+            self.marker_selected.emit(clicked_marker)
+            self.dragging_marker = clicked_marker
     
     def on_right_click(self, event):
         if self.file_type != 'image' or not self.display_pixmap:
