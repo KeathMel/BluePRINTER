@@ -271,6 +271,47 @@ class GL3DCanvas(QOpenGLWidget):
         self.model_display_scale = scale / 100.0
         self.update()
     
+    def project_to_screen(self, x, y, z):
+        """Project a 3D world point to 2D screen coords using current matrices."""
+        try:
+            modelview = glGetDoublev(GL_MODELVIEW_MATRIX)
+            projection = glGetDoublev(GL_PROJECTION_MATRIX)
+            viewport = glGetIntegerv(GL_VIEWPORT)
+            sx, sy, sz = gluProject(x, y, z, modelview, projection, viewport)
+            # OpenGL y is bottom-up; Qt y is top-down
+            return sx, viewport[3] - sy, sz
+        except Exception:
+            return None
+
+    def marker_at_screen(self, click_x, click_y):
+        """Return the marker whose projected screen position is nearest the
+        click within a pixel threshold, or None."""
+        self.makeCurrent()
+        # Re-run the same camera transform used in paintGL so projection matches
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+        glTranslatef(0, 0, -self.camera_zoom)
+        glRotatef(self.camera_rot_x, 1, 0, 0)
+        glRotatef(self.camera_rot_y, 0, 1, 0)
+        glScalef(self.model_display_scale, self.model_display_scale, self.model_display_scale)
+
+        best = None
+        best_dist = 24.0  # pixel radius for a hit
+        for marker in self.markers:
+            p = marker.get('position', {})
+            screen = self.project_to_screen(p.get('x', 0), p.get('y', 0), p.get('z', 0))
+            if screen is None:
+                continue
+            sx, sy, sz = screen
+            d = ((sx - click_x) ** 2 + (sy - click_y) ** 2) ** 0.5
+            if d < best_dist:
+                best_dist = d
+                best = marker
+
+        glPopMatrix()
+        return best
+
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
             marker = {
@@ -284,12 +325,12 @@ class GL3DCanvas(QOpenGLWidget):
             self.marker_selected.emit(marker)
             self.update()
         elif event.button() == Qt.LeftButton:
-            if self.markers:
-                for marker in reversed(self.markers):
-                    self.selected_marker = marker
-                    self.dragging = True
-                    self.marker_selected.emit(marker)
-                    break
+            # Pick the actual marker under the cursor
+            hit = self.marker_at_screen(event.x(), event.y())
+            if hit is not None:
+                self.selected_marker = hit
+                self.dragging = True
+                self.marker_selected.emit(hit)
             else:
                 self.selected_marker = None
                 self.dragging = False
