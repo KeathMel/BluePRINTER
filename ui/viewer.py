@@ -64,6 +64,7 @@ class ViewerWidget(QWidget):
     
     def refresh_display(self):
         if not self.display_pixmap:
+            print("[ERROR] No display pixmap!")
             return
         
         pixmap = self.display_pixmap.copy()
