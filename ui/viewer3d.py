@@ -25,12 +25,32 @@ class Viewer3D(QWidget):
     
     def __init__(self):
         super().__init__()
-        self.markers = []
-        self.selected_marker = None
-        self.dragging = False
-        self.drag_start_marker_pos = None
-        
         self.init_ui()
+    
+    # All marker state lives on the canvas - these delegate to it
+    @property
+    def markers(self):
+        return self.gl_widget.markers
+    
+    @markers.setter
+    def markers(self, value):
+        self.gl_widget.markers = value
+    
+    @property
+    def selected_marker(self):
+        return self.gl_widget.selected_marker
+    
+    @selected_marker.setter
+    def selected_marker(self, value):
+        self.gl_widget.selected_marker = value
+    
+    @property
+    def dragging(self):
+        return self.gl_widget.dragging
+    
+    @dragging.setter
+    def dragging(self, value):
+        self.gl_widget.dragging = value
     
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -75,7 +95,6 @@ class Viewer3D(QWidget):
         self.gl_widget.set_model_display_scale(value)
     
     def on_marker_selected(self, marker):
-        self.selected_marker = marker
         self.marker_selected.emit(marker)
     
     def load_file(self, file_path):
@@ -83,12 +102,9 @@ class Viewer3D(QWidget):
         self.show_scale_slider()
     
     def set_markers(self, markers):
-        self.markers = markers
         self.gl_widget.set_markers(markers)
     
     def clear(self):
-        self.markers = []
-        self.selected_marker = None
         self.gl_widget.clear()
         self.hide_scale_slider()
     
@@ -142,9 +158,6 @@ class GL3DCanvas(QOpenGLWidget):
         if self.model_vertices is not None:
             self.draw_model()
         
-        # Draw coordinate axes for marker positioning
-        self.draw_axes()
-        
         # Draw markers
         glColor3f(0.9, 0.07, 0.14)
         for marker in self.markers:
@@ -158,29 +171,6 @@ class GL3DCanvas(QOpenGLWidget):
             quad = gluNewQuadric()
             gluSphere(quad, 0.15 * scale, 8, 8)
             glPopMatrix()
-    
-    def draw_axes(self):
-        # X axis (red), Y axis (green), Z axis (blue)
-        glLineWidth(2)
-        glBegin(GL_LINES)
-        
-        # X
-        glColor3f(1, 0, 0)
-        glVertex3f(0, 0, 0)
-        glVertex3f(2, 0, 0)
-        
-        # Y
-        glColor3f(0, 1, 0)
-        glVertex3f(0, 0, 0)
-        glVertex3f(0, 2, 0)
-        
-        # Z
-        glColor3f(0, 0, 1)
-        glVertex3f(0, 0, 0)
-        glVertex3f(0, 0, 2)
-        
-        glEnd()
-        glLineWidth(1)
     
     def draw_model(self):
         glLineWidth(1.2)
@@ -271,10 +261,27 @@ class GL3DCanvas(QOpenGLWidget):
             self.camera_rot_y += dx * 0.5
             self.camera_rot_x += dy * 0.5
         elif event.buttons() & Qt.LeftButton and self.dragging and self.selected_marker:
-            # TRUE 3D movement - X, Y, Z
-            self.selected_marker['position']['x'] += dx * 0.01
-            self.selected_marker['position']['y'] -= dy * 0.01
-            self.selected_marker['position']['z'] += (dx - dy) * 0.005
+            # Move marker in the camera's screen plane so it follows the cursor
+            # regardless of how the camera is rotated.
+            speed = 0.01 * self.camera_zoom / self.model_display_scale
+            
+            rx = np.radians(self.camera_rot_x)
+            ry = np.radians(self.camera_rot_y)
+            
+            # Camera "right" vector in world space (screen X drag)
+            right = np.array([np.cos(ry), 0, -np.sin(ry)])
+            # Camera "up" vector in world space (screen Y drag)
+            up = np.array([
+                np.sin(ry) * np.sin(rx),
+                np.cos(rx),
+                np.cos(ry) * np.sin(rx),
+            ])
+            
+            move = right * (dx * speed) - up * (dy * speed)
+            
+            self.selected_marker['position']['x'] += float(move[0])
+            self.selected_marker['position']['y'] += float(move[1])
+            self.selected_marker['position']['z'] += float(move[2])
         
         self.last_x = event.x()
         self.last_y = event.y()

@@ -201,13 +201,19 @@ class BlueprintApp(QMainWindow):
         self.marker_panel.set_marker(marker)
     
     def on_marker_deleted(self, marker):
-        if self.viewer3d.isVisible():
-            self.viewer3d.markers.remove(marker)
-        else:
-            self.viewer.markers.remove(marker)
+        active = self.viewer3d if self.viewer3d.isVisible() else self.viewer
+        
+        # Remove by identity match
+        active.markers = [m for m in active.markers if m is not marker]
+        active.selected_marker = None
+        active.dragging = False
+        
         self.save_markers()
-        self.viewer.refresh_display()
-        self.viewer3d.update()
+        
+        if active is self.viewer3d:
+            self.viewer3d.set_markers(active.markers)
+        else:
+            self.viewer.refresh_display()
     
     def on_marker_scale_changed(self, scale):
         self.save_markers()
