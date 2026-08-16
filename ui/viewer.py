@@ -19,7 +19,6 @@ class ViewerWidget(QWidget):
         self.display_pixmap = None
         self.scale_x = 1.0
         self.scale_y = 1.0
-        self.pixmap_rect = QRect()
 
         self.viewer_label = QLabel()
         self.viewer_label.setAlignment(Qt.AlignCenter)
@@ -78,16 +77,18 @@ class ViewerWidget(QWidget):
         painter.end()
         self.viewer_label.setPixmap(pixmap)
 
+    def screen_to_image_coords(self, sx, sy):
+        # Compute the pixmap's offset within the label LIVE, so it's always
+        # correct even right after load before layout settles.
         pm = self.viewer_label.pixmap()
-        if pm:
+        if pm and not pm.isNull():
             lr = self.viewer_label.rect()
             xo = (lr.width() - pm.width()) / 2
             yo = (lr.height() - pm.height()) / 2
-            self.pixmap_rect = QRect(int(xo), int(yo), pm.width(), pm.height())
-
-    def screen_to_image_coords(self, sx, sy):
-        px = sx - self.pixmap_rect.x()
-        py = sy - self.pixmap_rect.y()
+        else:
+            xo, yo = 0, 0
+        px = sx - xo
+        py = sy - yo
         return px * self.scale_x, py * self.scale_y
 
     def find_marker_at(self, ox, oy):

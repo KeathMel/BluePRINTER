@@ -173,29 +173,35 @@ class GL3DCanvas(QOpenGLWidget):
             glPopMatrix()
     
     def draw_model(self):
-        glLineWidth(1.2)
-        glColor3f(1.0, 1.0, 1.0)
-        glBegin(GL_LINES)
-        
-        drawn_edges = set()
+        # Solid filled triangles - no wireframe lines
+        glColor3f(0.85, 0.85, 0.85)
+        glBegin(GL_TRIANGLES)
         for face in self.model_faces:
             try:
-                for i in range(len(face)):
-                    v1_idx = int(face[i])
-                    v2_idx = int(face[(i+1) % len(face)])
-                    edge = tuple(sorted([v1_idx, v2_idx]))
+                if len(face) >= 3:
+                    v0 = self.model_vertices[int(face[0])]
+                    v1 = self.model_vertices[int(face[1])]
+                    v2 = self.model_vertices[int(face[2])]
                     
-                    if edge not in drawn_edges:
-                        drawn_edges.add(edge)
-                        v1 = self.model_vertices[v1_idx]
-                        v2 = self.model_vertices[v2_idx]
-                        glVertex3f(float(v1[0]), float(v1[1]), float(v1[2]))
-                        glVertex3f(float(v2[0]), float(v2[1]), float(v2[2]))
+                    # Simple flat shading from face normal
+                    edge1 = np.array(v1) - np.array(v0)
+                    edge2 = np.array(v2) - np.array(v0)
+                    normal = np.cross(edge1, edge2)
+                    norm_len = np.linalg.norm(normal)
+                    if norm_len > 0:
+                        normal = normal / norm_len
+                    # Light from top-front
+                    light = np.array([0.3, 0.7, 0.5])
+                    shade = abs(np.dot(normal, light))
+                    shade = 0.35 + 0.65 * shade
+                    glColor3f(shade, shade, shade)
+                    
+                    glVertex3f(float(v0[0]), float(v0[1]), float(v0[2]))
+                    glVertex3f(float(v1[0]), float(v1[1]), float(v1[2]))
+                    glVertex3f(float(v2[0]), float(v2[1]), float(v2[2]))
             except:
                 pass
-        
         glEnd()
-        glLineWidth(1.0)
     
     def load_file(self, file_path):
         if not HAS_TRIMESH:
