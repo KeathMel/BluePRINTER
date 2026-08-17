@@ -231,9 +231,11 @@ class BlueprintApp(QMainWindow):
             
             if item_type == 'project':
                 menu.addAction("Add Files", lambda: self.add_files_to_project(item))
+                menu.addAction("Add Folder", lambda: self.add_folder(item))
                 menu.addAction("Delete", lambda: self.delete_item(item))
             elif item_type == 'folder':
                 menu.addAction("Add Files", lambda: self.add_files_to_folder(item))
+                menu.addAction("Add Folder", lambda: self.add_folder(item))
                 menu.addAction("Delete", lambda: self.delete_item(item))
             elif item_type == 'file':
                 menu.addAction("Delete", lambda: self.delete_item(item))
@@ -295,6 +297,25 @@ class BlueprintApp(QMainWindow):
             shutil.copy(f, Path(folder_path) / Path(f).name)
         
         self.refresh_projects()
+    
+    def add_folder(self, item):
+        from PyQt5.QtWidgets import QInputDialog
+        item_type, item_data = item.data(0, Qt.UserRole) or (None, None)
+        
+        # Resolve the parent directory
+        if item_type == 'project':
+            project = self.project_manager.get_project(item_data)
+            parent_path = project.path
+        elif item_type == 'folder':
+            parent_path = Path(item_data)
+        else:
+            return
+        
+        name, ok = QInputDialog.getText(self, "New Folder", "Folder name:")
+        if ok and name.strip():
+            new_folder = parent_path / name.strip()
+            new_folder.mkdir(parents=True, exist_ok=True)
+            self.refresh_projects()
     
     def delete_item(self, item):
         item_type, item_path = item.data(0, Qt.UserRole) or (None, None)
