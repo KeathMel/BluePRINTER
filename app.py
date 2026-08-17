@@ -24,6 +24,7 @@ class BlueprintApp(QMainWindow):
         self.marker_manager = None
         self.current_project = None
         self.current_file = None
+        self.text_editor_file = None
         
         self.init_ui()
         apply_iron_man_theme(self)
@@ -72,6 +73,7 @@ class BlueprintApp(QMainWindow):
         from ui.code_editor import CodeEditor
         self.text_editor = CodeEditor()
         self.text_editor.setVisible(False)
+        self.text_editor.textChanged.connect(self.auto_save_text)
         center_layout.addWidget(self.text_editor)
         
         # RIGHT - Marker Panel
@@ -144,6 +146,7 @@ class BlueprintApp(QMainWindow):
         self.viewer3d.clear()
         self.marker_panel.clear()
         self.text_editor.setVisible(False)
+        self.text_editor_file = None
         
         self.marker_manager = MarkerManager(self.current_project, self.current_file)
         
@@ -168,15 +171,32 @@ class BlueprintApp(QMainWindow):
         self.viewer3d.setVisible(False)
         self.marker_panel.clear()
         
+        # Block auto-save while we populate the editor with the file's content
+        self.text_editor.blockSignals(True)
         try:
             with open(self.current_file, 'r') as f:
                 content = f.read()
             self.text_editor.setPlainText(content)
+            self.text_editor_file = self.current_file
         except:
             self.text_editor.setPlainText("Error reading file")
+            self.text_editor_file = None
+        self.text_editor.blockSignals(False)
         
         self.text_editor.document().setDocumentMargin(8)
         self.text_editor.setVisible(True)
+    
+    def auto_save_text(self):
+        # Only save when the editor is showing a real file and is visible
+        if not getattr(self, 'text_editor_file', None):
+            return
+        if not self.text_editor.isVisible():
+            return
+        try:
+            with open(self.text_editor_file, 'w') as f:
+                f.write(self.text_editor.toPlainText())
+        except Exception as e:
+            print(f"[TEXT SAVE ERROR] {e}")
     
     def load_markers(self):
         if not self.marker_manager:
