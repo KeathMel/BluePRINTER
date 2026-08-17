@@ -163,8 +163,21 @@ class BlueprintApp(QMainWindow):
         elif ext in ['.txt', '.py', '.js', '.md', '.json', '.xml', '.html', '.css']:
             self.load_text_file()
         else:
-            self.viewer.setVisible(False)
-            self.viewer3d.setVisible(False)
+            # Unknown extension - try to open it as text; if it's binary, say so
+            try:
+                with open(self.current_file, 'r', encoding='utf-8') as f:
+                    f.read(1024)  # test it's readable text
+                self.load_text_file()
+            except Exception:
+                self.viewer.setVisible(False)
+                self.viewer3d.setVisible(False)
+                self.text_editor.blockSignals(True)
+                self.text_editor.setPlainText(
+                    f"Cannot preview this file type: {ext}\n\n{self.current_file.name}"
+                )
+                self.text_editor.blockSignals(False)
+                self.text_editor_file = None
+                self.text_editor.setVisible(True)
     
     def load_text_file(self):
         self.viewer.setVisible(False)
@@ -301,8 +314,13 @@ class BlueprintApp(QMainWindow):
         
         project = self.project_manager.get_project(proj_name)
         files, _ = QFileDialog.getOpenFileNames(self, "Select files")
+        added = 0
         for f in files:
-            project.add_file(f)
+            try:
+                project.add_file(f)
+                added += 1
+            except Exception as e:
+                QMessageBox.warning(self, "Add File Failed", f"Could not add {Path(f).name}:\n{e}")
         
         self.refresh_projects()
     
@@ -311,10 +329,13 @@ class BlueprintApp(QMainWindow):
         if item_type != 'folder':
             return
         
+        import shutil
         files, _ = QFileDialog.getOpenFileNames(self, "Select files")
         for f in files:
-            import shutil
-            shutil.copy(f, Path(folder_path) / Path(f).name)
+            try:
+                shutil.copy(f, Path(folder_path) / Path(f).name)
+            except Exception as e:
+                QMessageBox.warning(self, "Add File Failed", f"Could not add {Path(f).name}:\n{e}")
         
         self.refresh_projects()
     
