@@ -218,30 +218,15 @@ class GL3DCanvas(QOpenGLWidget):
             verts = np.array(mesh.vertices, dtype=np.float32)
             faces = np.array(mesh.faces, dtype=np.uint32)
             
-            # Center on the median vertex (robust to outliers)
-            center = np.median(verts, axis=0)
+            # Center and scale using the true bounding box. Works correctly for
+            # any shape, including long/thin models (swords, rods, blueprints).
+            bmin = verts.min(axis=0)
+            bmax = verts.max(axis=0)
+            center = (bmin + bmax) / 2.0
             verts = verts - center
-            
-            # Find the robust extent (2nd..98th percentile) to define what
-            # "inside the real model" means, ignoring stray outlier vertices.
-            lo = np.percentile(verts, 2, axis=0)
-            hi = np.percentile(verts, 98, axis=0)
-            extent = float(np.max(hi - lo))
+            extent = float(np.max(bmax - bmin))
             if extent <= 0:
                 extent = 1.0
-            
-            # Mark vertices that sit far outside the real cluster as outliers.
-            # Anything beyond 3x the robust extent from center is junk geometry.
-            limit = extent * 3.0
-            dist_from_center = np.linalg.norm(verts, axis=1)
-            good_vertex = dist_from_center <= limit
-            
-            # Keep only faces whose ALL three vertices are good - this drops
-            # the giant "wall" triangles that connect to outlier vertices.
-            face_ok = good_vertex[faces[:, 0]] & good_vertex[faces[:, 1]] & good_vertex[faces[:, 2]]
-            faces = faces[face_ok]
-            
-            # Scale the real model to 5 units
             verts = verts * (5.0 / extent)
             
             self.model_vertices = verts
@@ -263,8 +248,7 @@ class GL3DCanvas(QOpenGLWidget):
             shades = np.abs(normals @ light)
             self.face_shades = (0.35 + 0.65 * shades).astype(np.float32)
             
-            dropped = int((~face_ok).sum())
-            print(f"[3D] Loaded: {len(self.model_vertices)} verts, {len(self.model_faces)} faces, dropped {dropped} outlier faces, extent={extent:.3f}")
+            print(f"[3D] Loaded: {len(self.model_vertices)} verts, {len(self.model_faces)} faces, extent={extent:.3f}")
             self.update()
         except Exception as e:
             import traceback
