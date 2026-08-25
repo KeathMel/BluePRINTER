@@ -128,7 +128,8 @@ class GL3DCanvas(QOpenGLWidget):
         self.drag_depth = 0.5
         self.model_vertices = None
         self.model_faces = None
-        self.face_shades = None
+        self.vertex_shades = None
+        self.vertex_normals = None
         self.model_display_scale = 1.0
         self.camera_rot_x = 20
         self.camera_rot_y = 45
@@ -185,19 +186,16 @@ class GL3DCanvas(QOpenGLWidget):
         glEnable(GL_DEPTH_TEST)
     
     def draw_model(self):
-        # Solid filled triangles with precomputed shading
-        if self.model_faces is None or self.face_shades is None:
+        # Solid triangles with smooth per-vertex shading
+        if self.model_faces is None or self.vertex_shades is None:
             return
         glBegin(GL_TRIANGLES)
-        for i, face in enumerate(self.model_faces):
-            shade = self.face_shades[i]
-            glColor3f(shade, shade, shade)
-            v0 = self.model_vertices[int(face[0])]
-            v1 = self.model_vertices[int(face[1])]
-            v2 = self.model_vertices[int(face[2])]
-            glVertex3f(float(v0[0]), float(v0[1]), float(v0[2]))
-            glVertex3f(float(v1[0]), float(v1[1]), float(v1[2]))
-            glVertex3f(float(v2[0]), float(v2[1]), float(v2[2]))
+        for face in self.model_faces:
+            for idx in (int(face[0]), int(face[1]), int(face[2])):
+                s = self.vertex_shades[idx]
+                glColor3f(s, s, s)
+                vtx = self.model_vertices[idx]
+                glVertex3f(float(vtx[0]), float(vtx[1]), float(vtx[2]))
         glEnd()
     
     def load_file(self, file_path):
@@ -233,20 +231,34 @@ class GL3DCanvas(QOpenGLWidget):
             self.model_faces = faces
             self.model_display_scale = 1.0
             
-            # Precompute flat shading per face (vectorized)
+            # SMOOTH per-vertex shading (like Blender's smooth shading) so curved
+            # surfaces read as curved instead of faceted.
             v = self.model_vertices
             f = self.model_faces
             v0 = v[f[:, 0]]
             v1 = v[f[:, 1]]
             v2 = v[f[:, 2]]
-            normals = np.cross(v1 - v0, v2 - v0)
-            lengths = np.linalg.norm(normals, axis=1, keepdims=True)
-            lengths[lengths == 0] = 1
-            normals = normals / lengths
-            light = np.array([0.3, 0.7, 0.5])
+            
+            # Face normals (weighted by area via the un-normalized cross product)
+            face_normals = np.cross(v1 - v0, v2 - v0)
+            
+            # Accumulate face normals onto each vertex, then normalize -> smooth normals
+            vertex_normals = np.zeros_like(v)
+            np.add.at(vertex_normals, f[:, 0], face_normals)
+            np.add.at(vertex_normals, f[:, 1], face_normals)
+            np.add.at(vertex_normals, f[:, 2], face_normals)
+            vn_len = np.linalg.norm(vertex_normals, axis=1, keepdims=True)
+            vn_len[vn_len == 0] = 1
+            vertex_normals = vertex_normals / vn_len
+            self.vertex_normals = vertex_normals.astype(np.float32)
+            
+            # Per-vertex brightness from a directional light + ambient floor.
+            # No abs(): back-facing areas genuinely fall into shadow, giving form.
+            light = np.array([0.4, 0.8, 0.6])
             light = light / np.linalg.norm(light)
-            shades = np.abs(normals @ light)
-            self.face_shades = (0.35 + 0.65 * shades).astype(np.float32)
+            diffuse = np.clip(vertex_normals @ light, 0.0, 1.0)
+            ambient = 0.35
+            self.vertex_shades = (ambient + (1.0 - ambient) * diffuse).astype(np.float32)
             
             print(f"[3D] Loaded: {len(self.model_vertices)} verts, {len(self.model_faces)} faces, extent={extent:.3f}")
             self.update()
@@ -414,7 +426,8 @@ class GL3DCanvas(QOpenGLWidget):
     def clear(self):
         self.model_vertices = None
         self.model_faces = None
-        self.face_shades = None
+        self.vertex_shades = None
+        self.vertex_normals = None
         self.markers = []
         self.selected_marker = None
         self.dragging = False
