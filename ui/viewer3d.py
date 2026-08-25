@@ -207,9 +207,23 @@ class GL3DCanvas(QOpenGLWidget):
             mesh = trimesh.load(str(file_path))
             
             if isinstance(mesh, trimesh.Scene):
-                meshes = list(mesh.geometry.values())
-                if meshes:
-                    mesh = trimesh.util.concatenate(meshes)
+                # Flatten the scene WITH its node transforms applied, so parts
+                # that carry a rotation/offset (common from Blender GLB export)
+                # end up correctly oriented instead of sideways.
+                merged = None
+                try:
+                    merged = mesh.to_geometry()          # newer trimesh
+                except AttributeError:
+                    pass
+                if merged is None:
+                    try:
+                        merged = mesh.dump(concatenate=True)  # older trimesh
+                    except Exception:
+                        pass
+                if merged is None:
+                    # Last resort: concatenate raw geometry (no transforms)
+                    merged = trimesh.util.concatenate(list(mesh.geometry.values()))
+                mesh = merged
             elif isinstance(mesh, list):
                 mesh = trimesh.util.concatenate(mesh)
             
