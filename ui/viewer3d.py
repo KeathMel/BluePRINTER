@@ -129,8 +129,6 @@ class GL3DCanvas(QOpenGLWidget):
         self.model_vertices = None
         self.model_faces = None
         self.face_shades = None
-        self.model_edges = None
-        self.show_edges = True
         self.model_display_scale = 1.0
         self.camera_rot_x = 20
         self.camera_rot_y = 45
@@ -190,11 +188,6 @@ class GL3DCanvas(QOpenGLWidget):
         # Solid filled triangles with precomputed shading
         if self.model_faces is None or self.face_shades is None:
             return
-        
-        # Pass 1: solid shaded faces, pushed slightly back so edge lines
-        # can sit cleanly on top without z-fighting.
-        glEnable(GL_POLYGON_OFFSET_FILL)
-        glPolygonOffset(1.0, 1.0)
         glBegin(GL_TRIANGLES)
         for i, face in enumerate(self.model_faces):
             shade = self.face_shades[i]
@@ -206,20 +199,6 @@ class GL3DCanvas(QOpenGLWidget):
             glVertex3f(float(v1[0]), float(v1[1]), float(v1[2]))
             glVertex3f(float(v2[0]), float(v2[1]), float(v2[2]))
         glEnd()
-        glDisable(GL_POLYGON_OFFSET_FILL)
-        
-        # Pass 2: dark edge lines give the model crisp definition so detailed
-        # meshes don't blur into a smooth blob.
-        if self.show_edges and self.model_edges is not None:
-            glColor3f(0.15, 0.15, 0.15)
-            glLineWidth(1.0)
-            glBegin(GL_LINES)
-            for e in self.model_edges:
-                a = self.model_vertices[e[0]]
-                b = self.model_vertices[e[1]]
-                glVertex3f(float(a[0]), float(a[1]), float(a[2]))
-                glVertex3f(float(b[0]), float(b[1]), float(b[2]))
-            glEnd()
     
     def load_file(self, file_path):
         if not HAS_TRIMESH:
@@ -268,13 +247,6 @@ class GL3DCanvas(QOpenGLWidget):
             light = light / np.linalg.norm(light)
             shades = np.abs(normals @ light)
             self.face_shades = (0.35 + 0.65 * shades).astype(np.float32)
-            
-            # Precompute unique edges for the wireframe overlay (dedupe shared
-            # edges so each line is drawn once).
-            f = self.model_faces
-            e = np.vstack([f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]])
-            e = np.sort(e, axis=1)
-            self.model_edges = np.unique(e, axis=0)
             
             print(f"[3D] Loaded: {len(self.model_vertices)} verts, {len(self.model_faces)} faces, extent={extent:.3f}")
             self.update()
@@ -443,7 +415,6 @@ class GL3DCanvas(QOpenGLWidget):
         self.model_vertices = None
         self.model_faces = None
         self.face_shades = None
-        self.model_edges = None
         self.markers = []
         self.selected_marker = None
         self.dragging = False
