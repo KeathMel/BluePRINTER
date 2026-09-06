@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=BluePRINTER
+Comment=Blueprint and 3D model annotation tool
+Exec=bash -c "cd $HOME/BluePRINTER && ./BluePRINTER"
+Icon=applications-graphics
+Terminal=false
+Categories=Graphics;Utility;
