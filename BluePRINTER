@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# BluePRINTER launcher - sets up everything and runs the app.
+# Double-click this or run ./BluePRINTER - no manual venv needed.
+
+# Move to the folder this script lives in, wherever it was launched from
+cd "$(dirname "$(readlink -f "$0")")" || exit 1
+
+# Create the venv the first time only
+if [ ! -d "venv" ]; then
+    echo "First run: setting up environment (this happens once)..."
+    python -m venv venv
+    ./venv/bin/pip install --upgrade pip
+    ./venv/bin/pip install -r requirements.txt
+fi
+
+# Make sure deps are present even if venv already existed
+if ! ./venv/bin/python -c "import PyQt5" 2>/dev/null; then
+    echo "Installing dependencies..."
+    ./venv/bin/pip install -r requirements.txt
+fi
+
+# Run the app with the venv's python
+exec ./venv/bin/python app.py
